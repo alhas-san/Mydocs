@@ -1,0 +1,28 @@
+{
+  "generated_at_utc": "2026-11-20T17:54:20.692449+00:00",
+  "settings": {
+    "remove_graphics": true,
+    "export_pdf": true,
+    "font": "Times New Roman",
+    "font_size_pt": 12
+  },
+  "processed": [
+    {
+      "source": "Rehabilitation_Engineering_final exam.doc",
+      "status": "success",
+      "docx": "Formatted/Rehabilitation_Engineering_final exam_Formatted.docx",
+      "pdf": "Formatted/Rehabilitation_Engineering_final exam_Formatted.pdf",
+      "pages": 6,
+      "paragraph_count": 168,
+      "nonempty_paragraph_count": 127,
+      "text_characters": 6098,
+      "graphics_removed": 51
+    }
+  ],
+  "failures": [],
+  "summary": {
+    "total": 1,
+    "successful": 1,
+    "failed": 0
+  }
+}
