@@ -113,7 +113,9 @@ def format_doc(src,dest):
     doc=Document(str(src)); before=snapshot(doc)
     removed=remove_graphics(doc) if REMOVE_GRAPHICS else 0
     normal=doc.styles["Normal"]; normal.font.name=FONT; normal.font.size=Pt(BODY)
-    normal._element.rPr.rFonts.set(qn("w:ascii"),FONT); normal._element.rPr.rFonts.set(qn("w:hAnsi"),FONT); normal._element.rPr.rFonts.set(qn("w:cs"),FONT)
+    style_rpr=normal._element.get_or_add_rPr(); style_fonts=style_rpr.rFonts
+    if style_fonts is None: style_fonts=OxmlElement("w:rFonts"); style_rpr.insert(0,style_fonts)
+    style_fonts.set(qn("w:ascii"),FONT); style_fonts.set(qn("w:hAnsi"),FONT); style_fonts.set(qn("w:cs"),FONT); style_fonts.set(qn("w:eastAsia"),FONT)
     normal.paragraph_format.space_before=Pt(0); normal.paragraph_format.space_after=Pt(5); normal.paragraph_format.line_spacing=1.12
     for sec in doc.sections:
         sec.page_width=Cm(21); sec.page_height=Cm(29.7)
