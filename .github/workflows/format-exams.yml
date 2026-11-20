@@ -9,11 +9,11 @@ on:
       - "Incoming/*.doc"
       - "Incoming/*.docx"
       - "scripts/format_exams.py"
+      - "tests/**"
       - ".github/workflows/format-exams.yml"
 
 permissions:
   contents: write
-
 concurrency:
   group: exam-document-formatting
   cancel-in-progress: false
@@ -21,7 +21,7 @@ concurrency:
 jobs:
   format:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -41,16 +41,43 @@ jobs:
       - name: Install Python dependencies
         run: python -m pip install --upgrade pip "python-docx>=1.1,<2"
 
+      - name: Run formatter unit tests
+        run: python -m unittest discover -s tests -v
+
       - name: Format, validate and report
         run: python scripts/format_exams.py
 
+      - name: Create visual review previews
+        if: always()
+        run: |
+          mkdir -p Formatted/previews
+          for file in Formatted/*.pdf; do
+            [ -f "$file" ] || continue
+            name=$(basename "$file" .pdf)
+            pdftoppm -f 1 -l 3 -png -r 110 "$file" "Formatted/previews/$name-page" || true
+          done
+
+      - name: Upload formatted documents and previews for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatted-exam-review
+          path: |
+            Formatted/*.docx
+            Formatted/*.pdf
+            Formatted/processing_report.*
+            Formatted/previews/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Commit formatted documents and reports
+        if: success()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formatted/
           if ! git diff --cached --quiet; then
-            git commit -m "Format and validate exam documents"
+            git commit -m "Apply professional exam formatting profile"
             git pull --rebase origin main
             git push
           else
