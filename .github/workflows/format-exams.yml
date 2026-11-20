@@ -21,16 +21,17 @@ concurrency:
 jobs:
   format:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install LibreOffice
+      - name: Install LibreOffice and PDF validation tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y libreoffice
+          sudo apt-get install -y libreoffice poppler-utils
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -38,19 +39,19 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python dependencies
-        run: pip install python-docx
+        run: python -m pip install --upgrade pip "python-docx>=1.1,<2"
 
-      - name: Format Word exams and export PDF
+      - name: Format, validate and report
         run: python scripts/format_exams.py
 
-      - name: Commit formatted documents
+      - name: Commit formatted documents and reports
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formatted/
           if ! git diff --cached --quiet; then
-            git commit -m "Automatically format exam documents"
+            git commit -m "Format and validate exam documents"
             git push
           else
-            echo "No new formatted documents."
+            echo "No new formatted documents or reports."
           fi
