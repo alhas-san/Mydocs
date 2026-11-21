@@ -138,7 +138,7 @@ def reflow_mcq_options(doc):
             anchor=clone
             option_paragraphs.append(Paragraph(clone,parent))
         for row_index,(p,row) in enumerate(zip(option_paragraphs,rows)):
-            p.text=("\\t".join(value for _,value in row))
+            p.text=("\t".join(value for _,value in row))
             pf=p.paragraph_format
             pf.left_indent=Cm(0.35)
             pf.first_line_indent=Cm(0)
