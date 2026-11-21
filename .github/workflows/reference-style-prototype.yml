@@ -109,16 +109,16 @@ jobs:
               find Incoming -type f \( -iname '*.doc' -o -iname '*.docx' \) -print0
             fi
           )
-          if [ "\${#files[@]}" -eq 0 ]; then
+          if [ "${#files[@]}" -eq 0 ]; then
             echo "No uploaded exam documents found."
             exit 0
           fi
-          for file in "\${files[@]}"; do
-            relative="\${file#./}"
+          for file in "${files[@]}"; do
+            relative="${file#./}"
             base="$(basename "$file")"
-            stem="\${base%.*}"
+            stem="${base%.*}"
             if [[ "$relative" == Incoming/* ]]; then
-              stem="Incoming_\${stem}"
+              stem="Incoming_${stem}"
             fi
             prefix="$(printf '%s' "$stem" | tr -cs '[:alnum:]_.-' '_')"
             echo "Formatting: $relative"
