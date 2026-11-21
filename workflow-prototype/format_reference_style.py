@@ -151,7 +151,7 @@ def reflow_inline_options(doc):
             continue
         # Two options share a row only when each is short enough to fit in its
         # half-page column without compressing characters or colliding.
-        if all(len(body) <= 36 for _, body in chunks):
+        if all(len(body) <= 26 for _, body in chunks):
             rows = [(chunks[i], chunks[i + 1]) for i in range(0, len(chunks) - 1, 2)]
             if len(chunks) % 2:
                 rows.append((chunks[-1],))
@@ -209,30 +209,39 @@ def reflow_inline_options(doc):
     return changed
 
 def apply_option_spacing(doc):
-    """Give every MCQ option a consistent readable gap in the rendered document."""
+    """Keep question groups intact and normalize True/False answer blanks."""
     changed = 0
     paragraphs = all_paragraphs(doc)
     for index, p in enumerate(paragraphs):
-        paragraph_role = role(p.text)
-        next_is_option = (
-            index + 1 < len(paragraphs)
-            and role(paragraphs[index + 1].text) == "option"
-        )
-        # Many legacy exams store the question stem without its number in the
-        # same paragraph. Keep any non-empty stem directly before an option
-        # paragraph with its first option, preventing a stranded stem at page end.
-        if paragraph_role == "question" or (p.text.strip() and next_is_option):
+        text = p.text
+        paragraph_role = role(text)
+        next_role = role(paragraphs[index + 1].text) if index + 1 < len(paragraphs) else "empty"
+
+        # Prevent a paragraph's own lines from being split across pages.
+        if text.strip():
+            p.paragraph_format.keep_together = True
+            p.paragraph_format.widow_control = True
+
+        # Section headings stay with their instructions; MCQ stems stay with
+        # their first option.
+        if paragraph_role == "section" or (text.strip() and next_role == "option"):
             p.paragraph_format.keep_with_next = True
-        if paragraph_role != "option":
-            continue
-        fmt = p.paragraph_format
-        # Direct paragraph formatting overrides cramped source spacing inherited
-        # from legacy Word styles and applies equally to standalone and reflowed options.
-        fmt.space_before = Pt(1.5)
-        fmt.space_after = Pt(5)
-        fmt.line_spacing = 1.12
-        fmt.widow_control = True
-        changed += 1
+
+        if paragraph_role == "option":
+            label_match = OPTION_RE.match(text)
+            label = label_match.group(0).strip()[0] if label_match else ""
+            # Keep A/B/C attached to the following option; D ends the group.
+            if label in ("A", "B", "C"):
+                p.paragraph_format.keep_with_next = True
+            fmt = p.paragraph_format
+            fmt.space_before = Pt(1.5)
+            fmt.space_after = Pt(5)
+            fmt.line_spacing = 1.12
+            changed += 1
+
+        # Replace variable-width tab blanks with four fixed-width spaces.
+        if re.search(r"\(\s*\)", text):
+            p.text = re.sub(r"\(\s*\)", "(" + chr(160) * 4 + ")", text)
     return changed
 
 
