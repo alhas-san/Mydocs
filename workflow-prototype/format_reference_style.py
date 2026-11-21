@@ -5,6 +5,7 @@ import argparse, re, subprocess, tempfile
 from docx import Document
 from docx.shared import Cm, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.section import WD_SECTION_START
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -87,6 +88,8 @@ def format_exam(source, output_prefix):
 
         # Match the reference's clean A4 geometry while retaining source content and objects.
         for sec in doc.sections:
+            # Preserve section formatting without forcing each imported section onto a new page.
+            sec.start_type = WD_SECTION_START.CONTINUOUS
             sec.page_width, sec.page_height = Cm(21), Cm(29.7)
             sec.top_margin, sec.bottom_margin = Cm(1.55), Cm(1.55)
             sec.left_margin, sec.right_margin = Cm(1.65), Cm(1.65)
