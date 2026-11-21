@@ -246,8 +246,8 @@ def apply_option_spacing(doc):
         # Replace variable-width tab stops inside True/False parentheses with
         # exactly four non-breaking spaces, so Word/LibreOffice render equal blanks.
         for run in p.runs:
-            if run.text and re.search(r"\\([ \\t\\u00a0]*\\)", run.text):
-                run.text = re.sub(r"\\([ \\t\\u00a0]*\\)", "(\\u00a0\\u00a0\\u00a0\\u00a0)", run.text)
+            if run.text and re.search(r"\([ \t\u00a0]*\)", run.text):
+                run.text = re.sub(r"\([ \t\u00a0]*\)", "(    )", run.text)
     return changed
 
 
