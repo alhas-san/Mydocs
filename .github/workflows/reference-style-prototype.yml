@@ -1,10 +1,11 @@
-name: Reference-style exam workflow prototype
+name: Analytical Chemistry reference-style prototype
 on:
   push:
     branches:
       - "prototype/reference-exam-workflow"
     paths:
       - "workflow-prototype/**"
+      - "Analytical_Chemistry_I_Formatted.docx"
       - ".github/workflows/reference-style-prototype.yml"
   workflow_dispatch:
 permissions:
@@ -27,16 +28,17 @@ jobs:
           python-version: "3.12"
       - name: Install document dependency
         run: python -m pip install --upgrade pip "python-docx>=1.1,<2"
-      - name: Generate reference-style mockup
+      - name: Generate Analytical Chemistry reference-style mockup
         run: python workflow-prototype/format_reference_style.py
-      - name: Render first pages for visual inspection
+      - name: Render every page for visual inspection
         run: |
           mkdir -p workflow-prototype/output/previews
-          pdftoppm -f 1 -l 3 -png -r 120 workflow-prototype/output/Rehabilitation_Engineering_Reference_Style.pdf workflow-prototype/output/previews/page
+          pdfinfo workflow-prototype/output/Analytical_Chemistry_Reference_Style.pdf
+          pdftoppm -png -r 120 workflow-prototype/output/Analytical_Chemistry_Reference_Style.pdf workflow-prototype/output/previews/page
       - name: Upload prototype only (no repository commit)
         uses: actions/upload-artifact@v5
         with:
-          name: rehabilitation-engineering-reference-style-prototype
+          name: analytical-chemistry-reference-style-prototype
           path: workflow-prototype/output/
           if-no-files-found: error
           retention-days: 14
