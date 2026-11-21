@@ -116,19 +116,27 @@ def remove_forced_page_breaks(doc):
             if parent is not None: parent.remove(node)
 
 def option_chunks(paragraph):
-    """Split a source paragraph containing inline A./B./C./D. options into option texts."""
+    """Split only a clean, complete inline A-D option sequence.
+
+    Requiring the paragraph to begin with A and contain exactly A, B, C, D
+    prevents ordinary prose (or option-like text inside a question stem) from
+    being mistaken for an option list and silently discarded during reflow.
+    """
     text = paragraph.text
     matches = list(re.finditer(r"(?<![A-Za-z0-9])([A-D])\s*[.)]\s*", text))
-    if len(matches) < 2:
+    if text[:matches[0].start()].strip() if matches else True:
+        return []
+    if [m.group(1) for m in matches] != list("ABCD"):
         return []
     chunks = []
     for i, match in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         label = match.group(1) + match.group(0)[len(match.group(1)):].strip()
         body = text[match.end():end].strip()
-        if body:
-            chunks.append((label, body))
-    return chunks if len(chunks) >= 2 else []
+        if not body:
+            return []
+        chunks.append((label, body))
+    return chunks
 
 def reflow_inline_options(doc):
     """Lay out compact options in two columns; give long options a full-width row.
@@ -204,7 +212,12 @@ def apply_option_spacing(doc):
     """Give every MCQ option a consistent readable gap in the rendered document."""
     changed = 0
     for p in all_paragraphs(doc):
-        if role(p.text) != "option":
+        paragraph_role = role(p.text)
+        if paragraph_role == "question":
+            # Keep a question stem with at least the first following paragraph.
+            p.paragraph_format.keep_with_next = True
+            continue
+        if paragraph_role != "option":
             continue
         fmt = p.paragraph_format
         # Direct paragraph formatting overrides cramped source spacing inherited
