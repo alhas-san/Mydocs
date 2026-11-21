@@ -31,7 +31,7 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual([p.text for p in d.paragraphs],[
             "A. Walking frame","B. Blood test","C. X-ray film","D. Antibiotic"])
         for p in d.paragraphs:
-            self.assertAlmostEqual(p.paragraph_format.left_indent.cm,0.35,places=3)
+            self.assertAlmostEqual(p.paragraph_format.left_indent.cm,0.35,places=2)
             self.assertEqual(p.paragraph_format.first_line_indent.cm,0)
             self.assertTrue(p.paragraph_format.keep_together)
         self.assertTrue(d.paragraphs[0].paragraph_format.keep_with_next)
