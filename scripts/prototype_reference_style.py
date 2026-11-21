@@ -151,16 +151,12 @@ def format_reference_style(src: Path, dest: Path):
     add_title_frame(doc, title)
 
     # Normalize legacy hard page breaks and page-start section breaks only in this prototype copy.
-    for p in list(doc.paragraphs):
-        ppr = p._p.get_or_add_pPr()
-        page_before = ppr.find(qn("w:pageBreakBefore"))
-        if page_before is not None:
-            ppr.remove(page_before)
-        for node in list(p._p.iter()):
-            if node.tag == qn("w:br") and node.get(qn("w:type")) == "page":
-                node.getparent().remove(node)
-    for node in doc._element.iter():
-        if node.tag == qn("w:sectPr"):
+    for node in list(doc._element.iter()):
+        if node.tag == qn("w:pageBreakBefore") and node.getparent() is not None:
+            node.getparent().remove(node)
+        elif node.tag == qn("w:br") and node.get(qn("w:type")) == "page" and node.getparent() is not None:
+            node.getparent().remove(node)
+        elif node.tag == qn("w:sectPr"):
             typ = node.find(qn("w:type"))
             if typ is not None and typ.get(qn("w:val")) in ("nextPage", "oddPage", "evenPage"):
                 typ.set(qn("w:val"), "continuous")
