@@ -180,7 +180,10 @@ def remove_unwanted_page_breaks(doc):
         sect=ppr.find(qn("w:sectPr"))
         if sect is not None:
             typ=sect.find(qn("w:type"))
-            if typ is not None and typ.get(qn("w:val")) in {"nextPage","oddPage","evenPage"}:
+            if typ is None:
+                typ=OxmlElement("w:type")
+                sect.insert(0,typ)
+            if typ.get(qn("w:val")) != "continuous":
                 typ.set(qn("w:val"),"continuous")
                 removed+=1
         for node in list(p._p.iter()):
