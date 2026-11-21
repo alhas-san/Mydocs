@@ -251,7 +251,7 @@ def apply_option_spacing(doc):
                 continue
             if re.search(r"\([ \t\u00a0]*\)", run.text):
                 run.text = re.sub(r"\([ \t\u00a0]*\)", "(    )", run.text)
-            elif run.text == "\\t" and run_index > 0 and run_index + 1 < len(runs):
+            elif run.text == "\t" and run_index > 0 and run_index + 1 < len(runs):
                 if runs[run_index - 1].text.strip().endswith("(") and runs[run_index + 1].text.strip().startswith(")"):
                     run.text = "    "
     return changed
