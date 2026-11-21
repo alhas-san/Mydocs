@@ -56,12 +56,10 @@ def all_paragraphs(doc):
     return result
 
 def snapshot(doc):
-    ps=all_paragraphs(doc); values=[]
-    for p in ps:
-        # Generated page-number fields are layout metadata, not source exam text.
-        has_page_field=any(el.tag==qn("w:instrText") and "PAGE" in (el.text or "").upper() for el in p._p.iter())
-        if not has_page_field: values.append(p.text)
-    return {"paragraphs":len(values),"nonempty":sum(bool(x.strip()) for x in values),"text":"\n".join(values),"characters":sum(map(len,values))}
+    # Compare exam-body content (including nested table cells), not generated
+    # headers/footers such as the page-number field added by this formatter.
+    ps=list(paragraphs(doc)); values=[p.text for p in ps]
+    return {"paragraphs":len(ps),"nonempty":sum(bool(x.strip()) for x in values),"text":"\n".join(values),"characters":sum(map(len,values))}
 
 def remove_graphics(doc):
     count=0; seen=set()
