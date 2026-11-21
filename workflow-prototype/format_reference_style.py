@@ -10,7 +10,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 ROOT=Path(__file__).resolve().parents[1]
-SRC=ROOT/"workflow-prototype/input/marketing_exam.docx"
+SRC=ROOT/"Formatted/Rehabilitation_Engineering_final exam_Formatted.docx"
 OUT=ROOT/"workflow-prototype/output"
 NAVY="17365D"; BLUE="DCE6F1"; GOLD="B08B2B"; WHITE="FFFFFF"; BORDER="AAB7C4"
 ARABIC_RE=re.compile(r"[\u0600-\u06ff]")
@@ -111,11 +111,11 @@ def main():
         if not footer.text:
             r=footer.add_run()
             fld=OxmlElement("w:fldSimple"); fld.set(qn("w:instr"),"PAGE"); r._r.addnext(fld)
-    dest=OUT/"Marketing_Principles_Reference_Style.docx"
+    dest=OUT/"Rehabilitation_Engineering_Reference_Style.docx"
     doc.save(dest)
     with tempfile.TemporaryDirectory() as tmp:
         subprocess.run(["libreoffice","--headless",f"-env:UserInstallation=file://{tmp}/profile","--convert-to","pdf","--outdir",str(OUT),str(dest)],check=True,capture_output=True,text=True)
-    pdf=OUT/"Marketing_Principles_Reference_Style.pdf"
+    pdf=OUT/"Rehabilitation_Engineering_Reference_Style.pdf"
     subprocess.run(["pdfinfo",str(pdf)],check=True,capture_output=True,text=True)
     print(f"Created {dest} and {pdf}")
 if __name__=="__main__": main()
