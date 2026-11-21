@@ -62,7 +62,7 @@ class FormatterTests(unittest.TestCase):
             d.add_paragraph(value)
         reflow_mcq_options(d)
         text=d.paragraphs[0].text
-        self.assertNotIn("\\t",text)
+        self.assertNotIn("\t",text)
         self.assertEqual(text.splitlines(),[
             "A. Short",
             "B. This is the one long answer choice that cannot fit in the second column",
@@ -76,7 +76,7 @@ class FormatterTests(unittest.TestCase):
             d.add_paragraph(value)
         reflow_mcq_options(d)
         p=d.paragraphs[0]
-        self.assertEqual(p.text,"A. Yes\\tB. No\\nC. Maybe\\tD. None")
+        self.assertEqual(p.text,"A. Yes\tB. No\nC. Maybe\tD. None")
         self.assertEqual(len(p.paragraph_format.tab_stops),1)
 
 if __name__=="__main__":
