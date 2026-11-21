@@ -200,6 +200,23 @@ def reflow_inline_options(doc):
         changed += 1
     return changed
 
+def apply_option_spacing(doc):
+    """Give every MCQ option a consistent readable gap in the rendered document."""
+    changed = 0
+    for p in all_paragraphs(doc):
+        if role(p.text) != "option":
+            continue
+        fmt = p.paragraph_format
+        # Direct paragraph formatting overrides cramped source spacing inherited
+        # from legacy Word styles and applies equally to standalone and reflowed options.
+        fmt.space_before = Pt(1.5)
+        fmt.space_after = Pt(5)
+        fmt.line_spacing = 1.12
+        fmt.widow_control = True
+        changed += 1
+    return changed
+
+
 def content_snapshot(doc):
     normalize = lambda value: re.sub(r"\s+", " ", value).strip()
     return (
@@ -241,6 +258,7 @@ def format_exam(source, reference_path, output_prefix):
             spec = samples.get(r, samples.get("body", fallback))
             for run in p.runs:
                 if run.text: apply_font(run, spec)
+        spaced_option_paragraphs = apply_option_spacing(doc)
         # Preserve tables and their existing geometry; transfer reference table style
         # only where a matching named style exists.
         for table in doc.tables:
@@ -268,6 +286,7 @@ def format_exam(source, reference_path, output_prefix):
     print(f"Created {output_docx.name} and {pdf.name}; pages={pages.group(1) if pages else 'unknown'}")
     print("Reference-derived font profile:", samples)
     print(f"Option layout: reflowed {option_paragraphs} inline option paragraphs")
+    print(f"Option spacing: applied readable paragraph spacing to {spaced_option_paragraphs} option paragraphs")
     print("Content-preservation check: PASSED")
 
 if __name__ == "__main__":
