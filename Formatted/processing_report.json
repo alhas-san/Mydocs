@@ -1,9 +1,11 @@
 {
-  "generated_at_utc": "2026-11-21T18:22:35.088243+00:00",
+  "generated_at_utc": "2026-11-21T18:26:03.132463+00:00",
   "format_profile": "professional_exam_v3",
   "settings": {
-    "font": "Times New Roman",
+    "font_latin": "Calibri",
+    "font_arabic": "Traditional Arabic",
     "body_size_pt": 11,
+    "arabic_body_size_pt": 14,
     "page": "A4",
     "margins_cm": {
       "top": 2.2,
@@ -43,8 +45,8 @@
       "status": "success",
       "docx": "Formatted/��Computer Networks basics  Final Exam_Formatted.docx",
       "pdf": "Formatted/��Computer Networks basics  Final Exam_Formatted.pdf",
-      "pages": 7,
-      "pdf_extracted_characters": 6899,
+      "pages": 8,
+      "pdf_extracted_characters": 6904,
       "paragraph_count": 181,
       "nonempty_paragraph_count": 129,
       "text_characters": 7786,
