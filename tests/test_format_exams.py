@@ -3,6 +3,8 @@ from tempfile import TemporaryDirectory
 from pathlib import Path
 from docx import Document
 from docx.enum.text import WD_BREAK
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from scripts.format_exams import classify, format_doc, snapshot, reflow_mcq_options, remove_unwanted_page_breaks
 
 class FormatterTests(unittest.TestCase):
@@ -28,14 +30,15 @@ class FormatterTests(unittest.TestCase):
             d.add_paragraph(value)
         before=snapshot(d)["text"]
         self.assertEqual(reflow_mcq_options(d),4)
-        self.assertEqual([p.text for p in d.paragraphs],[
-            "A. Walking frame","B. Blood test","C. X-ray film","D. Antibiotic"])
+        self.assertEqual(len(d.paragraphs),2)
+        self.assertEqual(d.paragraphs[0].text.split("\t"),["A. Walking frame","B. Blood test"])
+        self.assertEqual(d.paragraphs[1].text.split("\t"),["C. X-ray film","D. Antibiotic"])
         for p in d.paragraphs:
             self.assertAlmostEqual(p.paragraph_format.left_indent.cm,0.35,places=2)
             self.assertEqual(p.paragraph_format.first_line_indent.cm,0)
             self.assertTrue(p.paragraph_format.keep_together)
         self.assertTrue(d.paragraphs[0].paragraph_format.keep_with_next)
-        self.assertFalse(d.paragraphs[3].paragraph_format.keep_with_next)
+        self.assertFalse(d.paragraphs[1].paragraph_format.keep_with_next)
         self.assertEqual(before,snapshot(d)["text"])
 
     def test_inline_mcq_options_become_four_paragraphs(self):
@@ -57,6 +60,7 @@ class FormatterTests(unittest.TestCase):
         reflow_mcq_options(d)
         self.assertEqual(len(d.paragraphs),4)
         self.assertTrue(all(p.paragraph_format.keep_together for p in d.paragraphs))
+        self.assertTrue(all("\t" not in p.text for p in d.paragraphs))
 
     def test_inline_and_separate_options_can_be_combined(self):
         d=Document()
@@ -64,8 +68,9 @@ class FormatterTests(unittest.TestCase):
         d.add_paragraph("C. Three")
         d.add_paragraph("D. Four")
         reflow_mcq_options(d)
-        self.assertEqual([p.text for p in d.paragraphs],[
-            "A. One","B. Two","C. Three","D. Four"])
+        self.assertEqual(len(d.paragraphs),2)
+        self.assertEqual(d.paragraphs[0].text.split("\t"),["A. One","B. Two"])
+        self.assertEqual(d.paragraphs[1].text.split("\t"),["C. Three","D. Four"])
 
     def test_removes_manual_page_breaks(self):
         d=Document()
