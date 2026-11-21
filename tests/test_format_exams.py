@@ -163,5 +163,26 @@ class FormatterTests(unittest.TestCase):
             self.assertIsNone(english._p.get_or_add_pPr().find(qn("w:bidi")))
 
 
+    def test_professional_arabic_and_latin_fonts_are_applied(self):
+        with TemporaryDirectory() as tmp:
+            src=Path(tmp)/"fonts.docx"; dst=Path(tmp)/"formatted.docx"
+            d=Document()
+            d.add_paragraph("كلية العلوم والتكنولوجيا")
+            d.add_paragraph("Computer Networks")
+            d.save(src)
+            format_doc(src,dst)
+            result=Document(dst)
+            arabic_run=result.paragraphs[0].runs[0]
+            english_run=result.paragraphs[1].runs[0]
+            arabic_fonts=arabic_run._element.get_or_add_rPr().rFonts
+            english_fonts=english_run._element.get_or_add_rPr().rFonts
+            self.assertEqual(arabic_fonts.get(qn("w:cs")),"Traditional Arabic")
+            self.assertEqual(arabic_fonts.get(qn("w:ascii")),"Calibri")
+            self.assertEqual(arabic_run.font.size.pt,14)
+            self.assertEqual(english_fonts.get(qn("w:ascii")),"Calibri")
+            self.assertEqual(english_run.font.size.pt,11)
+
+
+
 if __name__=="__main__":
     unittest.main()
