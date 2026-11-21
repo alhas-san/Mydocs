@@ -255,7 +255,8 @@ def format_exam(source, reference_path, output_prefix):
     pages = re.search(r"^Pages:\s+(\d+)", info, re.M)
     print(f"Created {output_docx.name} and {pdf.name}; pages={pages.group(1) if pages else 'unknown'}")
     print("Reference-derived font profile:", samples)
-    print(f"Option layout: reflowed {option_paragraphs} inline option paragraphs")\n    print("Content-preservation check: PASSED")
+    print(f"Option layout: reflowed {option_paragraphs} inline option paragraphs")
+    print("Content-preservation check: PASSED")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
