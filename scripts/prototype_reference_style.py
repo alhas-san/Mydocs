@@ -150,6 +150,21 @@ def format_reference_style(src: Path, dest: Path):
         title = src.stem.replace("_", " ")
     add_title_frame(doc, title)
 
+    # Normalize legacy hard page breaks and page-start section breaks only in this prototype copy.
+    for p in list(doc.paragraphs):
+        ppr = p._p.get_or_add_pPr()
+        page_before = ppr.find(qn("w:pageBreakBefore"))
+        if page_before is not None:
+            ppr.remove(page_before)
+        for node in list(p._p.iter()):
+            if node.tag == qn("w:br") and node.get(qn("w:type")) == "page":
+                node.getparent().remove(node)
+    for node in doc._element.iter():
+        if node.tag == qn("w:sectPr"):
+            typ = node.find(qn("w:type"))
+            if typ is not None and typ.get(qn("w:val")) in ("nextPage", "oddPage", "evenPage"):
+                typ.set(qn("w:val"), "continuous")
+
     for section in doc.sections:
         section.page_width = Cm(21)
         section.page_height = Cm(29.7)
@@ -173,6 +188,9 @@ def format_reference_style(src: Path, dest: Path):
 
     for ti, table in enumerate(doc.tables):
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        if ti == 0 and len(table.rows) == 1 and len(table.columns) == 1:
+            # Keep the framed title visually dominant; it is not an exam content table.
+            continue
         table.autofit = True
         # Two-cell section/marks bars get a light formal band.
         is_question_band = len(table.rows) == 1 and len(table.columns) == 2
