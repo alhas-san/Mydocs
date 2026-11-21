@@ -372,9 +372,9 @@ def apply_reference_header(reference_path, output_docx, exam_title):
         program_parent.insert(program_index, _make_dropdown("academic-program", "Select Program", program_choices, 71001, program_run.find(_w("rPr"))))
 
         level_run_properties = level_run.find(_w("rPr"))
-        _replace_run_with_dropdown(level_semester_p, "2nd", _make_dropdown("academic-level", "Select Level", level_choices, 71002, level_run_properties))
+        _replace_run_with_dropdown(level_semester_p, "2nd", _make_dropdown("academic-level", "Select", level_choices, 71002, level_run_properties))
         semester_run_properties = semester_run.find(_w("rPr"))
-        _replace_run_with_dropdown(level_semester_p, "3rd", _make_dropdown("academic-semester", "Select Semester", semester_choices, 71003, semester_run_properties))
+        _replace_run_with_dropdown(level_semester_p, "3rd", _make_dropdown("academic-semester", "Select", semester_choices, 71003, semester_run_properties))
 
         # The exam title is per-document; do not carry the reference subject into another exam.
         for run in title_p.xpath("./w:r", namespaces=ns):
@@ -390,7 +390,8 @@ def apply_reference_header(reference_path, output_docx, exam_title):
                 elif t.text and t.text.startswith("/11/2026"):
                     t.text = "          Time:"
                 elif t.text == "3":
-                    t.text = "____"
+                    t.text = "____ "
+                t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
 
         header_bytes = etree.tostring(header, xml_declaration=True, encoding="UTF-8", standalone=True)
         header_rels = ref_zip.read(rels_name).replace(b"media/image2.png", b"media/reference_header_logo.png")
@@ -496,7 +497,7 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
 
         output_docx = OUT / f"{output_prefix}.docx"
         doc.save(output_docx)
-        inferred_title = exam_title or re.sub(r"[_-]+", " ", source.stem).replace("_Incoming", "").strip().title()
+        inferred_title = exam_title or re.sub(r"\\b(?:final|midterm|main)?\\s*exam(?:ination)?\\b", "", re.sub(r"[_-]+", " ", source.stem), flags=re.I).strip().title()
         apply_reference_header(reference_path, output_docx, inferred_title)
         profile = Path(tmp) / "pdf-profile"
         subprocess.run(["libreoffice", "--headless", f"-env:UserInstallation=file://{profile}",
