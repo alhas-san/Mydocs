@@ -1,6 +1,6 @@
 # Exam processing report
 
-- Generated (UTC): 2026-11-21T17:47:24.540725+00:00
+- Generated (UTC): 2026-11-21T17:57:51.195088+00:00
 - Profile: Professional exam v3
 - Successful: 1
 - Failed: 0
@@ -8,7 +8,7 @@
 
 | Source | Status | Pages | Questions | Sections | Tables | Graphics removed |
 |---|---:|---:|---:|---:|---:|---:|
-| `Rehabilitation_Engineering_final exam.doc` | OK | 6 | 11 | 3 | 1 | 51 |
+| `Rehabilitation_Engineering_final exam.doc` | OK | 7 | 11 | 5 | 1 | 51 |
   - DOCX: `Formatted/Rehabilitation_Engineering_final exam_Formatted.docx`
   - PDF: `Formatted/Rehabilitation_Engineering_final exam_Formatted.pdf`
 
