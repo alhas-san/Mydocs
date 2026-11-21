@@ -2,7 +2,7 @@ import unittest
 from tempfile import TemporaryDirectory
 from pathlib import Path
 from docx import Document
-from scripts.format_exams import classify, format_doc, snapshot
+from scripts.format_exams import classify, format_doc, snapshot, reflow_mcq_options
 
 class FormatterTests(unittest.TestCase):
     def test_semantic_classification(self):
@@ -11,12 +11,45 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(classify(d.add_paragraph("SECTION B"),9),"section")
         self.assertEqual(classify(d.add_paragraph("(a) Define"),9),"subquestion")
         self.assertEqual(classify(d.add_paragraph("Duration: Two hours"),9),"metadata")
+
     def test_text_preservation_with_table(self):
         with TemporaryDirectory() as tmp:
             src=Path(tmp)/"source.docx"; dst=Path(tmp)/"formatted.docx"
             d=Document(); d.add_paragraph("College of Science"); d.add_paragraph("Final Examination")
             d.add_paragraph("Question 1: Explain")
-            t=d.add_table(rows=1,cols=2); t.cell(0,0).text="Part A"; t.cell(0,1).text="Part B"; d.save(src)
+            table=d.add_table(rows=1,cols=2); table.cell(0,0).text="Part A"; table.cell(0,1).text="Part B"; d.save(src)
             before=snapshot(Document(src))["text"]; format_doc(src,dst)
             self.assertEqual(before,snapshot(Document(dst))["text"])
-if __name__=="__main__": unittest.main()
+
+    def test_short_mcq_options_are_paired(self):
+        d=Document()
+        for value in ("A. Walking frame","B. Blood test","C. X-ray film","D. Antibiotic"):
+            d.add_paragraph(value)
+        before=snapshot(d)["text"]
+        self.assertEqual(reflow_mcq_options(d),4)
+        self.assertEqual(len(d.paragraphs),1)
+        self.assertEqual(d.paragraphs[0].text,"A. Walking frame\\tB. Blood test\\nC. X-ray film\\tD. Antibiotic")
+        self.assertEqual(before,snapshot(d)["text"])
+
+    def test_long_mcq_options_stay_on_separate_lines(self):
+        d=Document()
+        for value in (
+            "A. Improve quality of life and independence of people with disabilities",
+            "B. Replace all clinical professionals",
+            "C. Study only electrical circuits",
+            "D. Diagnose infectious diseases",
+        ):
+            d.add_paragraph(value)
+        reflow_mcq_options(d)
+        self.assertEqual(len(d.paragraphs),1)
+        self.assertNotIn("\\t",d.paragraphs[0].text)
+        self.assertEqual(len(d.paragraphs[0].text.splitlines()),4)
+
+    def test_inline_mcq_options_are_split_and_paired(self):
+        d=Document()
+        d.add_paragraph("A. Walking frame B. Blood test C. X-ray film D. Antibiotic")
+        reflow_mcq_options(d)
+        self.assertEqual(d.paragraphs[0].text,"A. Walking frame\\tB. Blood test\\nC. X-ray film\\tD. Antibiotic")
+
+if __name__=="__main__":
+    unittest.main()
