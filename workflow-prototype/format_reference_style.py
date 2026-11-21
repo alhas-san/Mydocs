@@ -115,6 +115,85 @@ def remove_forced_page_breaks(doc):
             parent = node.getparent()
             if parent is not None: parent.remove(node)
 
+def option_chunks(paragraph):
+    """Split a source paragraph containing inline A./B./C./D. options into option texts."""
+    text = paragraph.text
+    matches = list(re.finditer(r"(?<![A-Za-z0-9])([A-D])\\s*[.)]\\s*", text))
+    if len(matches) < 2:
+        return []
+    chunks = []
+    for i, match in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        label = match.group(1) + "."
+        body = text[match.end():end].strip()
+        if body:
+            chunks.append((label, body))
+    return chunks if len(chunks) >= 2 else []
+
+def reflow_inline_options(doc):
+    """Lay out compact options in two columns; give long options a full-width row.
+
+    Fixed tab stops replace the source's irregular run-level spacing. The paragraph
+    count and the actual option wording remain unchanged.
+    """
+    changed = 0
+    for p in all_paragraphs(doc):
+        chunks = option_chunks(p)
+        if not chunks:
+            continue
+        # Two options share a row only when each is short enough to fit in its
+        # half-page column without compressing characters or colliding.
+        rows = []
+        i = 0
+        while i < len(chunks):
+            label, body = chunks[i]
+            if i + 1 < len(chunks):
+                next_label, next_body = chunks[i + 1]
+                if len(body) <= 36 and len(next_body) <= 36:
+                    rows.append(((label, body), (next_label, next_body)))
+                    i += 2
+                    continue
+            rows.append(((label, body),))
+            i += 1
+
+        # Retain the paragraph's paragraph-level properties, but rebuild its runs
+        # so inherited negative character spacing and old tabs cannot squeeze text.
+        ppr = p._p.pPr
+        for child in list(p._p):
+            if child is not ppr:
+                p._p.remove(child)
+        fmt = p.paragraph_format
+        fmt.left_indent = Cm(0)
+        fmt.first_line_indent = Cm(0)
+        fmt.right_indent = Cm(0)
+        fmt.space_before = Pt(0)
+        fmt.space_after = Pt(2)
+        fmt.line_spacing = 1.0
+        tabs = fmt.tab_stops
+        tabs.clear_all()
+        tabs.add_tab_stop(Cm(8.0))
+        for row_index, row in enumerate(rows):
+            if row_index:
+                br = OxmlElement("w:r")
+                brpr = OxmlElement("w:rPr")
+                br.append(brpr)
+                br.append(OxmlElement("w:br"))
+                p._p.append(br)
+            for col_index, (label, body) in enumerate(row):
+                if col_index:
+                    tab_run = OxmlElement("w:r")
+                    tab_run.append(OxmlElement("w:tab"))
+                    p._p.append(tab_run)
+                run = p.add_run(label + " " + body)
+                # Prevent legacy negative character-spacing values from narrowing
+                # the text. Use the reference-derived option font, with normal tracking.
+                rpr = run._r.get_or_add_rPr()
+                spacing = rpr.find(qn("w:spacing"))
+                if spacing is not None:
+                    rpr.remove(spacing)
+        changed += 1
+    return changed
+
 def content_snapshot(doc):
     return (
         [p.text for p in doc.paragraphs],
@@ -180,7 +259,7 @@ def format_exam(source, reference_path, output_prefix):
     pages = re.search(r"^Pages:\s+(\d+)", info, re.M)
     print(f"Created {output_docx.name} and {pdf.name}; pages={pages.group(1) if pages else 'unknown'}")
     print("Reference-derived font profile:", samples)
-    print("Content-preservation check: PASSED")
+    print(f"Option layout: reflowed {option_paragraphs} inline option paragraphs")\n    print("Content-preservation check: PASSED")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
