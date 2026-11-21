@@ -124,7 +124,7 @@ def option_chunks(paragraph):
     chunks = []
     for i, match in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        label = match.group(1) + "."
+        label = match.group(1) + match.group(0)[len(match.group(1)):].strip()
         body = text[match.end():end].strip()
         if body:
             chunks.append((label, body))
@@ -151,6 +151,16 @@ def reflow_inline_options(doc):
             # If any option is too long for half-width, keep every option in
             # this question on its own full-width line for consistent alignment.
             rows = [(item,) for item in chunks]
+
+        # Do not rebuild paragraphs that contain drawings, fields, hyperlinks, or
+        # other non-run content: rebuilding those would silently discard objects.
+        allowed_children = {qn("w:pPr"), qn("w:r")}
+        if any(child.tag not in allowed_children for child in p._p):
+            continue
+        allowed_run_children = {qn("w:rPr"), qn("w:t"), qn("w:tab"), qn("w:br"), qn("w:cr")}
+        if any(node.tag not in allowed_run_children
+               for run in p._p.findall(qn("w:r")) for node in run):
+            continue
 
         # Retain the paragraph's paragraph-level properties, but rebuild its runs
         # so inherited negative character spacing and old tabs cannot squeeze text.
@@ -193,7 +203,7 @@ def reflow_inline_options(doc):
 def content_snapshot(doc):
     normalize = lambda value: re.sub(r"\s+", " ", value).strip()
     return (
-        [normalize(p.text) for p in doc.paragraphs],
+        normalize(" ".join(p.text for p in doc.paragraphs)),
         [[normalize(cell.text) for row in table.rows for cell in row.cells] for table in doc.tables],
         len(doc.inline_shapes),
     )
