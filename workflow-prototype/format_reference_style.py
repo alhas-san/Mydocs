@@ -143,18 +143,14 @@ def reflow_inline_options(doc):
             continue
         # Two options share a row only when each is short enough to fit in its
         # half-page column without compressing characters or colliding.
-        rows = []
-        i = 0
-        while i < len(chunks):
-            label, body = chunks[i]
-            if i + 1 < len(chunks):
-                next_label, next_body = chunks[i + 1]
-                if len(body) <= 36 and len(next_body) <= 36:
-                    rows.append(((label, body), (next_label, next_body)))
-                    i += 2
-                    continue
-            rows.append(((label, body),))
-            i += 1
+        if all(len(body) <= 36 for _, body in chunks):
+            rows = [(chunks[i], chunks[i + 1]) for i in range(0, len(chunks) - 1, 2)]
+            if len(chunks) % 2:
+                rows.append((chunks[-1],))
+        else:
+            # If any option is too long for half-width, keep every option in
+            # this question on its own full-width line for consistent alignment.
+            rows = [(item,) for item in chunks]
 
         # Retain the paragraph's paragraph-level properties, but rebuild its runs
         # so inherited negative character spacing and old tabs cannot squeeze text.
