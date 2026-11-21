@@ -168,6 +168,8 @@ class FormatterTests(unittest.TestCase):
             src=Path(tmp)/"fonts.docx"; dst=Path(tmp)/"formatted.docx"
             d=Document()
             d.add_paragraph("كلية العلوم والتكنولوجيا")
+            d.add_paragraph("المقرر: شبكات الحاسوب")
+            d.add_paragraph("السؤال ١: اشرح المفهوم")
             d.add_paragraph("هذا نص عربي عادي لاختبار حجم المتن")
             d.add_paragraph("Computer Networks")
             d.save(src)
