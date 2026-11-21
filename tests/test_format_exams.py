@@ -138,6 +138,18 @@ class FormatterTests(unittest.TestCase):
             for run in p.runs:
                 self.assertIsNotNone(run._element.get_or_add_rPr().find(qn("w:rtl")))
 
+
+    def test_arabic_question_with_latin_option_labels_keeps_rtl_direction(self):
+        d=Document()
+        d.add_paragraph("السؤال ٢: اختر الإجابة الصحيحة")
+        for value in ("A- First choice","B- Second choice","C- Third choice","D- Fourth choice"):
+            d.add_paragraph(value)
+        self.assertEqual(reflow_mcq_options(d),4)
+        self.assertEqual(len(d.paragraphs),3)
+        for p in d.paragraphs[1:]:
+            self.assertIsNotNone(p._p.get_or_add_pPr().find(qn("w:bidi")))
+
+
     def test_arabic_document_paragraphs_are_rtl_but_english_remains_ltr(self):
         with TemporaryDirectory() as tmp:
             src=Path(tmp)/"arabic.docx"; dst=Path(tmp)/"formatted.docx"
