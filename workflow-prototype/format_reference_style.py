@@ -318,6 +318,7 @@ def _insert_after_text_run(p, exact_text, dropdown):
             return True
     return False
 
+# The dropdowns are editable Word content controls embedded in the first-page header.
 def apply_reference_header(reference_path, output_docx, exam_title):
     """Copy the Analytical Chemistry first-page header and turn its academic fields into Word dropdowns."""
     with zipfile.ZipFile(reference_path, "r") as ref_zip:
