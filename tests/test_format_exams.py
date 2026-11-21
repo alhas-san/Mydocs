@@ -28,7 +28,7 @@ class FormatterTests(unittest.TestCase):
         before=snapshot(d)["text"]
         self.assertEqual(reflow_mcq_options(d),4)
         self.assertEqual(len(d.paragraphs),1)
-        self.assertEqual(d.paragraphs[0].text,"A. Walking frame\\tB. Blood test\\nC. X-ray film\\tD. Antibiotic")
+        self.assertEqual(d.paragraphs[0].text,"A. Walking frame\tB. Blood test\nC. X-ray film\tD. Antibiotic")
         self.assertEqual(before,snapshot(d)["text"])
 
     def test_long_mcq_options_stay_on_separate_lines(self):
@@ -42,14 +42,14 @@ class FormatterTests(unittest.TestCase):
             d.add_paragraph(value)
         reflow_mcq_options(d)
         self.assertEqual(len(d.paragraphs),1)
-        self.assertNotIn("\\t",d.paragraphs[0].text)
+        self.assertNotIn("\t",d.paragraphs[0].text)
         self.assertEqual(len(d.paragraphs[0].text.splitlines()),4)
 
     def test_inline_mcq_options_are_split_and_paired(self):
         d=Document()
         d.add_paragraph("A. Walking frame B. Blood test C. X-ray film D. Antibiotic")
         reflow_mcq_options(d)
-        self.assertEqual(d.paragraphs[0].text,"A. Walking frame\\tB. Blood test\\nC. X-ray film\\tD. Antibiotic")
+        self.assertEqual(d.paragraphs[0].text,"A. Walking frame\tB. Blood test\nC. X-ray film\tD. Antibiotic")
 
 if __name__=="__main__":
     unittest.main()
