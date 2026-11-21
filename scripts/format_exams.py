@@ -110,8 +110,8 @@ def reflow_mcq_options(doc):
         lines=[]
         k=0
         while k<len(collected):
-            if k+1<len(collected) and options_fit_together(collected[k],collected[k+1]):
-                lines.append(collected[k]+"\t"+collected[k+1])
+            if k+1<len(collected) and options_fit_together(collected[k][1],collected[k+1][1]):
+                lines.append(collected[k][1]+"\t"+collected[k+1][1])
                 k+=2
             else:
                 lines.append(collected[k][1])
