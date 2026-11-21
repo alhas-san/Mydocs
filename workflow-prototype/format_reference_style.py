@@ -151,7 +151,7 @@ def reflow_inline_options(doc):
             continue
         # Two options share a row only when each is short enough to fit in its
         # half-page column without compressing characters or colliding.
-        if all(len(body) <= 26 for _, body in chunks):
+        if all(len(body) <= 22 for _, body in chunks):
             rows = [(chunks[i], chunks[i + 1]) for i in range(0, len(chunks) - 1, 2)]
             if len(chunks) % 2:
                 rows.append((chunks[-1],))
@@ -224,7 +224,7 @@ def apply_option_spacing(doc):
         # Keep section headings, numbered stems, and each option row attached.
         # Chaining keep_with_next across A/B/C/D keeps the entire option set
         # with its question rather than allowing the last options to spill.
-        if paragraph_role in {"section", "question"}:
+        if paragraph_role in {"section", "question"} or (p.text.strip() and next_role == "option"):
             p.paragraph_format.keep_with_next = True
         if paragraph_role == "option" and next_role == "option":
             p.paragraph_format.keep_with_next = True
@@ -245,9 +245,15 @@ def apply_option_spacing(doc):
 
         # Replace variable-width tab stops inside True/False parentheses with
         # exactly four non-breaking spaces, so Word/LibreOffice render equal blanks.
-        for run in p.runs:
-            if run.text and re.search(r"\([ \t\u00a0]*\)", run.text):
+        runs = p.runs
+        for run_index, run in enumerate(runs):
+            if not run.text:
+                continue
+            if re.search(r"\([ \t\u00a0]*\)", run.text):
                 run.text = re.sub(r"\([ \t\u00a0]*\)", "(    )", run.text)
+            elif run.text == "\\t" and run_index > 0 and run_index + 1 < len(runs):
+                if runs[run_index - 1].text.strip().endswith("(") and runs[run_index + 1].text.strip().startswith(")"):
+                    run.text = "    "
     return changed
 
 
