@@ -19,8 +19,10 @@ OUTPUT=ROOT/"Formatted"
 INPUT_DIRS=(ROOT,ROOT/"Incoming")
 REMOVE_GRAPHICS=True
 EXPORT_PDF=True
-FONT="Times New Roman"
+FONT="Calibri"
+ARABIC_FONT="Traditional Arabic"
 BODY=11
+ARABIC_SIZE_OFFSET=3
 GRAPHICS={qn("w:drawing"),qn("w:pict"),qn("w:object")}
 QUESTION=re.compile(r"^\s*(?:(?:question|q)\s*[0-9٠-٩]{1,3}(?=\s|[:.)-]|$)|(?:السؤال|سؤال)\s*(?:[0-9٠-٩]{1,3}|الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر)(?=\s|[:.)-]|$)|[0-9٠-٩]{1,3}\s*[\).:-])",re.I)
 SUBQUESTION=re.compile(r"^\s*(?:\([a-z0-9أإآابجدد٠-٩]+\)|[a-zأإآابجد]\s*[\).])",re.I)
@@ -237,18 +239,26 @@ def set_paragraph_direction(p, rtl):
         ppr.remove(bidi)
 
 def font(run,size=BODY,bold=None,rtl=False):
-    run.font.name=FONT; run.font.size=Pt(size)
+    # Calibri for Latin text; Traditional Arabic for complex-script glyphs.
+    # Traditional Arabic is set 3 pt larger for comparable visual weight/readability.
+    run.font.name=FONT
+    run.font.size=Pt(size+ARABIC_SIZE_OFFSET if rtl else size)
     if bold is not None: run.bold=bold
     rpr=run._element.get_or_add_rPr(); rf=rpr.rFonts
     if rf is None: rf=OxmlElement("w:rFonts"); rpr.insert(0,rf)
     for k in ("ascii","hAnsi","eastAsia"): rf.set(qn(f"w:{k}"),FONT)
-    rf.set(qn("w:cs"),"Arial" if rtl else FONT)
+    rf.set(qn("w:cs"),ARABIC_FONT if rtl else FONT)
     rtl_node=rpr.find(qn("w:rtl"))
     if rtl:
         if rtl_node is None: rtl_node=OxmlElement("w:rtl"); rpr.append(rtl_node)
         rtl_node.set(qn("w:val"),"1")
     elif rtl_node is not None:
         rpr.remove(rtl_node)
+    lang=rpr.find(qn("w:lang"))
+    if lang is None: lang=OxmlElement("w:lang"); rpr.append(lang)
+    lang.set(qn("w:val"),"en-US")
+    if rtl: lang.set(qn("w:bidi"),"ar-SA")
+    else: lang.attrib.pop(qn("w:bidi"),None)
 
 def classify(p,index):
     t=p.text.strip()
@@ -290,7 +300,7 @@ def format_doc(src,dest):
     normal=doc.styles["Normal"]; normal.font.name=FONT; normal.font.size=Pt(BODY)
     style_rpr=normal._element.get_or_add_rPr(); style_fonts=style_rpr.rFonts
     if style_fonts is None: style_fonts=OxmlElement("w:rFonts"); style_rpr.insert(0,style_fonts)
-    style_fonts.set(qn("w:ascii"),FONT); style_fonts.set(qn("w:hAnsi"),FONT); style_fonts.set(qn("w:cs"),FONT); style_fonts.set(qn("w:eastAsia"),FONT)
+    style_fonts.set(qn("w:ascii"),FONT); style_fonts.set(qn("w:hAnsi"),FONT); style_fonts.set(qn("w:cs"),ARABIC_FONT); style_fonts.set(qn("w:eastAsia"),FONT)
     normal.paragraph_format.space_before=Pt(0); normal.paragraph_format.space_after=Pt(5); normal.paragraph_format.line_spacing=1.12
     for sec in doc.sections:
         sec.page_width=Cm(21); sec.page_height=Cm(29.7)
@@ -383,7 +393,7 @@ def process(src):
 
 def reports(ok,failed):
     OUTPUT.mkdir(parents=True,exist_ok=True)
-    data={"generated_at_utc":datetime.now(timezone.utc).isoformat(),"format_profile":"professional_exam_v3","settings":{"font":FONT,"body_size_pt":BODY,"page":"A4","margins_cm":{"top":2.2,"bottom":2.0,"left":2.3,"right":2.0},"page_numbers":"centered_footer","remove_graphics":REMOVE_GRAPHICS,"remove_stray_page_breaks":True},"processed":ok,"failures":failed,"summary":{"total":len(ok)+len(failed),"successful":len(ok),"failed":len(failed)}}
+    data={"generated_at_utc":datetime.now(timezone.utc).isoformat(),"format_profile":"professional_exam_v3","settings":{"font_latin":FONT,"font_arabic":ARABIC_FONT,"body_size_pt":BODY,"arabic_body_size_pt":BODY+ARABIC_SIZE_OFFSET,"page":"A4","margins_cm":{"top":2.2,"bottom":2.0,"left":2.3,"right":2.0},"page_numbers":"centered_footer","remove_graphics":REMOVE_GRAPHICS,"remove_stray_page_breaks":True},"processed":ok,"failures":failed,"summary":{"total":len(ok)+len(failed),"successful":len(ok),"failed":len(failed)}}
     (OUTPUT/"processing_report.json").write_text(json.dumps(data,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     lines=["# Exam processing report","",f"- Generated (UTC): {data['generated_at_utc']}","- Profile: Professional exam v3",f"- Successful: {len(ok)}",f"- Failed: {len(failed)}","- A4 layout, semantic question hierarchy, adaptive MCQ option pairing, table spacing and centered page numbers","","| Source | Status | Pages | Questions | Sections | Tables | Graphics removed |","|---|---:|---:|---:|---:|---:|---:|"]
     for x in ok:
