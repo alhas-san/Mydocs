@@ -78,12 +78,16 @@ def parse_options(text):
              else raw[m.start():].strip()) for i,m in enumerate(matches)]
 
 def options_fit_together(first, second):
-    # Conservative line-width estimate for 11 pt Times New Roman on A4 with
-    # the configured margins. The limit leaves room for the tab separator.
-    return len(first)<=42 and len(second)<=42 and len(first)+len(second)+4<=86
+    # Each option occupies one fixed-width column (8.3 cm) on an A4 page.
+    # A conservative character limit prevents either column from wrapping.
+    return len(first)<=38 and len(second)<=38
 
 def reflow_mcq_options(doc):
-    """Place short MCQ choices in pairs; keep long choices on separate lines."""
+    """Use a consistent two-column layout only when every choice is short.
+
+    If even one choice is too long, put every choice on its own line. This
+    avoids the visually inconsistent mixture of paired and single options.
+    """
     ps=list(doc.paragraphs)
     changed=0
     i=0
@@ -104,20 +108,19 @@ def reflow_mcq_options(doc):
             remove.append(ps[j])
             expected+=1
             j+=1
-        if len(collected)<2:
+        if expected!=4 or [label for label,_ in collected]!=list("ABCD"):
             i+=1
             continue
-        lines=[]
-        k=0
-        while k<len(collected):
-            if k+1<len(collected) and options_fit_together(collected[k][1],collected[k+1][1]):
-                lines.append(collected[k][1]+"\t"+collected[k+1][1])
-                k+=2
-            else:
-                lines.append(collected[k][1])
-                k+=1
+        choice_text=[value for _,value in collected]
+        # Pair all four choices or none: one long choice switches the entire
+        # group to a clean single-column layout.
+        if all(len(value)<=38 for value in choice_text):
+            lines=[choice_text[0]+"\t"+choice_text[1],
+                   choice_text[2]+"\t"+choice_text[3]]
+            ps[i].paragraph_format.tab_stops.add_tab_stop(Cm(8.3))
+        else:
+            lines=choice_text
         ps[i].text="\n".join(lines)
-        ps[i].paragraph_format.tab_stops.add_tab_stop(Cm(8.2))
         for p in remove:
             p._element.getparent().remove(p._element)
         changed+=len(collected)
