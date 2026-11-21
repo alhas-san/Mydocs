@@ -51,5 +51,33 @@ class FormatterTests(unittest.TestCase):
         reflow_mcq_options(d)
         self.assertEqual(d.paragraphs[0].text,"A. Walking frame\tB. Blood test\nC. X-ray film\tD. Antibiotic")
 
+    def test_one_long_choice_forces_all_choices_onto_separate_lines(self):
+        d=Document()
+        for value in (
+            "A. Short",
+            "B. This is the one long answer choice that cannot fit in the second column",
+            "C. Also short",
+            "D. Short too",
+        ):
+            d.add_paragraph(value)
+        reflow_mcq_options(d)
+        text=d.paragraphs[0].text
+        self.assertNotIn("\\t",text)
+        self.assertEqual(text.splitlines(),[
+            "A. Short",
+            "B. This is the one long answer choice that cannot fit in the second column",
+            "C. Also short",
+            "D. Short too",
+        ])
+
+    def test_short_options_use_one_fixed_column_tab_stop(self):
+        d=Document()
+        for value in ("A. Yes","B. No","C. Maybe","D. None"):
+            d.add_paragraph(value)
+        reflow_mcq_options(d)
+        p=d.paragraphs[0]
+        self.assertEqual(p.text,"A. Yes\\tB. No\\nC. Maybe\\tD. None")
+        self.assertEqual(len(p.paragraph_format.tab_stops),1)
+
 if __name__=="__main__":
     unittest.main()
