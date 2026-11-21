@@ -1,10 +1,10 @@
 # Exam processing report
 
-- Generated (UTC): 2026-11-21T17:17:04.747907+00:00
+- Generated (UTC): 2026-11-21T17:42:14.017017+00:00
 - Profile: Professional exam v3
 - Successful: 1
 - Failed: 0
-- A4 layout, semantic question hierarchy, table spacing and centered page numbers
+- A4 layout, semantic question hierarchy, adaptive MCQ option pairing, table spacing and centered page numbers
 
 | Source | Status | Pages | Questions | Sections | Tables | Graphics removed |
 |---|---:|---:|---:|---:|---:|---:|

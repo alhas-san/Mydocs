@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-11-21T17:17:04.747907+00:00",
+  "generated_at_utc": "2026-11-21T17:42:14.017017+00:00",
   "format_profile": "professional_exam_v3",
   "settings": {
     "font": "Times New Roman",
@@ -24,13 +24,14 @@
       "pdf_extracted_characters": 5327,
       "paragraph_count": 153,
       "nonempty_paragraph_count": 127,
-      "text_characters": 6098,
+      "text_characters": 6178,
+      "mcq_options_reflowed": 80,
       "graphics_removed": 51,
       "layout_counts": {
         "opening": 2,
         "section": 3,
         "question": 11,
-        "subquestion": 33,
+        "subquestion": 30,
         "metadata": 0
       },
       "table_count": 1
