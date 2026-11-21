@@ -30,7 +30,7 @@ jobs:
       - name: Install document dependency
         run: python -m pip install --upgrade pip "python-docx>=1.1,<2"
       - name: Generate Analytical Chemistry reference-style mockup
-        run: python workflow-prototype/format_reference_style.py --input "Analytical_Chemistry_I_Formatted.docx" --output-prefix "Analytical_Chemistry_Reference_Style"
+        run: python workflow-prototype/format_reference_style.py --input "Analytical_Chemistry_I_Formatted.docx" --reference "Analytical_Chemistry_I_Formatted.docx" --output-prefix "Analytical_Chemistry_Reference_Style"
       - name: Render every page for visual inspection
         run: |
           mkdir -p workflow-prototype/output/previews/analytical-chemistry
@@ -58,7 +58,7 @@ jobs:
       - name: Install document dependency
         run: python -m pip install --upgrade pip "python-docx>=1.1,<2"
       - name: Convert legacy DOC, then apply reference style
-        run: python workflow-prototype/format_reference_style.py --input "Rehabilitation_Engineering_final exam.doc" --output-prefix "Rehabilitation_Engineering_Reference_Style"
+        run: python workflow-prototype/format_reference_style.py --input "Rehabilitation_Engineering_final exam.doc" --reference "Analytical_Chemistry_I_Formatted.docx" --output-prefix "Rehabilitation_Engineering_Reference_Style"
       - name: Render every page for visual inspection
         run: |
           mkdir -p workflow-prototype/output/previews/rehabilitation-engineering
