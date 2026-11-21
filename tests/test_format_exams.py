@@ -2,6 +2,7 @@ import unittest
 from tempfile import TemporaryDirectory
 from pathlib import Path
 from docx import Document
+from docx.enum.text import WD_BREAK
 from scripts.format_exams import classify, format_doc, snapshot, reflow_mcq_options, remove_unwanted_page_breaks
 
 class FormatterTests(unittest.TestCase):
@@ -30,7 +31,7 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual([p.text for p in d.paragraphs],[
             "A. Walking frame","B. Blood test","C. X-ray film","D. Antibiotic"])
         for p in d.paragraphs:
-            self.assertEqual(p.paragraph_format.left_indent.cm,0.35)
+            self.assertAlmostEqual(p.paragraph_format.left_indent.cm,0.35,places=3)
             self.assertEqual(p.paragraph_format.first_line_indent.cm,0)
             self.assertTrue(p.paragraph_format.keep_together)
         self.assertTrue(d.paragraphs[0].paragraph_format.keep_with_next)
@@ -70,7 +71,7 @@ class FormatterTests(unittest.TestCase):
         d=Document()
         p=d.add_paragraph("Question")
         p.paragraph_format.page_break_before=True
-        p.add_run().add_break(7)
+        p.add_run().add_break(WD_BREAK.PAGE)
         removed=remove_unwanted_page_breaks(d)
         self.assertGreaterEqual(removed,1)
         self.assertFalse(p.paragraph_format.page_break_before)
