@@ -263,11 +263,14 @@ def font(run,size=BODY,bold=None,rtl=False):
 def classify(p,index):
     t=p.text.strip()
     if not t: return "blank"
-    if index<3 and len(t)<140 and not QUESTION.match(t): return "opening"
+    # Semantic structures take priority over the opening-page heuristic. An
+    # early question, section heading, or metadata line must not be enlarged
+    # and styled as a document title merely because it appears near the top.
     if SECTION.match(t) or (len(t)<=85 and t.isupper() and any(c.isalpha() for c in t)): return "section"
     if QUESTION.match(t): return "question"
     if SUBQUESTION.match(t): return "subquestion"
     if META.match(t): return "metadata"
+    if index<3 and len(t)<140: return "opening"
     return "body"
 
 def cell_margins(cell):
