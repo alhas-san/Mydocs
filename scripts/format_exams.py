@@ -116,11 +116,12 @@ def reflow_mcq_options(doc):
         j=i+1
         while expected<4 and j<len(ps):
             following=parse_options(ps[j].text)
-            if len(following)!=1 or following[0][0]!=list("ABCD")[expected]:
+            if (not following or following[0][0]!=list("ABCD")[expected]
+                    or len(following)>4-expected):
                 break
             collected.extend(following)
             remove.append(ps[j])
-            expected+=1
+            expected+=len(following)
             j+=1
         if expected!=4 or [label for label,_ in collected]!=list("ABCD"):
             i+=1
