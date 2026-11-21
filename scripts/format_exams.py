@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Iterable
 from docx import Document
 from docx.text.paragraph import Paragraph
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.shared import Cm, Pt
 from docx.oxml import OxmlElement
@@ -79,8 +79,29 @@ def parse_options(text):
     return [(labels[i], raw[m.start():matches[i+1].start()].strip() if i+1<len(matches)
              else raw[m.start():].strip()) for i,m in enumerate(matches)]
 
+def estimated_option_width_cm(text, size_pt=BODY):
+    """Conservative Times-style width estimate for deciding whether a pair fits."""
+    units=0.0
+    for ch in text:
+        if ch in " ilI.,:;!'|": units+=0.25
+        elif ch in "MW@%&": units+=0.85
+        elif ch.isupper(): units+=0.64
+        elif ch.isdigit(): units+=0.50
+        elif ch.isspace(): units+=0.27
+        else: units+=0.49
+    return units*size_pt*2.54/72
+
+def options_fit_two_columns(choices):
+    """Use two columns only when BOTH rows safely fit the available text width."""
+    # A4 width minus the formatter's left/right margins and option indentation.
+    column_width=7.35
+    return (estimated_option_width_cm(choices[0][1]) <= column_width and
+            estimated_option_width_cm(choices[1][1]) <= column_width and
+            estimated_option_width_cm(choices[2][1]) <= column_width and
+            estimated_option_width_cm(choices[3][1]) <= column_width)
+
 def reflow_mcq_options(doc):
-    """Put every A-D choice in its own uniformly aligned paragraph."""
+    """Reflow A-D uniformly: two columns if every option fits, otherwise four rows."""
     ps=list(doc.paragraphs)
     changed=0
     i=0
@@ -106,15 +127,17 @@ def reflow_mcq_options(doc):
             continue
         original=ps[i]
         parent=original._parent
+        paired=options_fit_two_columns(collected)
+        rows=[collected[:2],collected[2:]] if paired else [[x] for x in collected]
         anchor=original._p
         option_paragraphs=[original]
-        for _ in range(3):
+        for _ in range(len(rows)-1):
             clone=deepcopy(original._p)
             anchor.addnext(clone)
             anchor=clone
             option_paragraphs.append(Paragraph(clone,parent))
-        for p,(label,value) in zip(option_paragraphs,collected):
-            p.text=value
+        for row_index,(p,row) in enumerate(zip(option_paragraphs,rows)):
+            p.text=("\\t".join(value for _,value in row))
             pf=p.paragraph_format
             pf.left_indent=Cm(0.35)
             pf.first_line_indent=Cm(0)
@@ -122,15 +145,28 @@ def reflow_mcq_options(doc):
             pf.space_before=Pt(0)
             pf.space_after=Pt(2)
             pf.keep_together=True
-            pf.keep_with_next=(label!="D")
+            pf.keep_with_next=(row_index<len(rows)-1)
+            pf.tab_stops.clear_all()
+            if len(row)==2:
+                pf.tab_stops.add_tab_stop(Cm(8.0),WD_TAB_ALIGNMENT.LEFT)
+        # Keep the question stem (and any blank spacer paragraphs immediately
+        # before the choices) attached to the first option row.
+        previous=original._p.getprevious()
+        while previous is not None:
+            previous_para=Paragraph(previous,parent)
+            previous_para.paragraph_format.keep_with_next=True
+            if previous_para.text.strip():
+                break
+            previous=previous.getprevious()
         for p in remove:
             p._element.getparent().remove(p._element)
         changed+=4
         i=j
+        ps=list(doc.paragraphs)
     return changed
 
 def remove_unwanted_page_breaks(doc):
-    """Remove hard page breaks and stale pagination hints from source files."""
+    """Remove forced page breaks, including next/odd/even-page section starts."""
     removed=0
     for p in all_paragraphs(doc):
         ppr=p._p.get_or_add_pPr()
@@ -138,6 +174,14 @@ def remove_unwanted_page_breaks(doc):
         if page_before is not None:
             ppr.remove(page_before)
             removed+=1
+        # A section break can force a new page even when no explicit page-break
+        # run exists. Preserve section properties, but make the transition continuous.
+        sect=ppr.find(qn("w:sectPr"))
+        if sect is not None:
+            typ=sect.find(qn("w:type"))
+            if typ is not None and typ.get(qn("w:val")) in {"nextPage","oddPage","evenPage"}:
+                typ.set(qn("w:val"),"continuous")
+                removed+=1
         for node in list(p._p.iter()):
             if node.tag==qn("w:lastRenderedPageBreak"):
                 node.getparent().remove(node)
