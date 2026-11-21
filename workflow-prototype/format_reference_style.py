@@ -497,7 +497,7 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
 
         output_docx = OUT / f"{output_prefix}.docx"
         doc.save(output_docx)
-        inferred_title = exam_title or re.sub(r"\\b(?:final|midterm|main)?\\s*exam(?:ination)?\\b", "", re.sub(r"[_-]+", " ", source.stem), flags=re.I).strip().title()
+        inferred_title = exam_title or re.sub(r"\b(?:final|midterm|main)?\s*exam(?:ination)?\b", "", re.sub(r"[_-]+", " ", source.stem), flags=re.I).strip().title()
         apply_reference_header(reference_path, output_docx, inferred_title)
         profile = Path(tmp) / "pdf-profile"
         subprocess.run(["libreoffice", "--headless", f"-env:UserInstallation=file://{profile}",
