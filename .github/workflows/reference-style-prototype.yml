@@ -32,11 +32,11 @@ jobs:
       - name: Render first pages for visual inspection
         run: |
           mkdir -p workflow-prototype/output/previews
-          pdftoppm -f 1 -l 3 -png -r 120 workflow-prototype/output/Marketing_Principles_Reference_Style.pdf workflow-prototype/output/previews/page
+          pdftoppm -f 1 -l 3 -png -r 120 workflow-prototype/output/Rehabilitation_Engineering_Reference_Style.pdf workflow-prototype/output/previews/page
       - name: Upload prototype only (no repository commit)
         uses: actions/upload-artifact@v5
         with:
-          name: marketing-exam-reference-style-prototype
+          name: rehabilitation-engineering-reference-style-prototype
           path: workflow-prototype/output/
           if-no-files-found: error
           retention-days: 14
