@@ -213,35 +213,41 @@ def apply_option_spacing(doc):
     changed = 0
     paragraphs = all_paragraphs(doc)
     for index, p in enumerate(paragraphs):
-        text = p.text
-        paragraph_role = role(text)
+        paragraph_role = role(p.text)
         next_role = role(paragraphs[index + 1].text) if index + 1 < len(paragraphs) else "empty"
+        has_inline_image = bool(p._p.xpath(".//w:drawing | .//w:pict"))
+        next_has_inline_image = (
+            index + 1 < len(paragraphs)
+            and bool(paragraphs[index + 1]._p.xpath(".//w:drawing | .//w:pict"))
+        )
 
-        # Prevent a paragraph's own lines from being split across pages.
-        if text.strip():
-            p.paragraph_format.keep_together = True
-            p.paragraph_format.widow_control = True
-
-        # Section headings stay with their instructions; MCQ stems stay with
-        # their first option.
-        if paragraph_role == "section" or (text.strip() and next_role == "option"):
+        # Keep section headings, numbered stems, and each option row attached.
+        # Chaining keep_with_next across A/B/C/D keeps the entire option set
+        # with its question rather than allowing the last options to spill.
+        if paragraph_role in {"section", "question"}:
             p.paragraph_format.keep_with_next = True
+        if paragraph_role == "option" and next_role == "option":
+            p.paragraph_format.keep_with_next = True
+        if p.text.strip() and next_has_inline_image:
+            p.paragraph_format.keep_with_next = True
+        if has_inline_image:
+            p.paragraph_format.keep_together = True
+        if paragraph_role in {"question", "option", "section"}:
+            p.paragraph_format.keep_together = True
 
         if paragraph_role == "option":
-            label_match = OPTION_RE.match(text)
-            label = label_match.group(0).strip()[0] if label_match else ""
-            # Keep A/B/C attached to the following option; D ends the group.
-            if label in ("A", "B", "C"):
-                p.paragraph_format.keep_with_next = True
             fmt = p.paragraph_format
             fmt.space_before = Pt(1.5)
             fmt.space_after = Pt(5)
             fmt.line_spacing = 1.12
+            fmt.widow_control = True
             changed += 1
 
-        # Replace variable-width tab blanks with four fixed-width spaces.
-        if re.search(r"\(\s*\)", text):
-            p.text = re.sub(r"\(\s*\)", "(" + chr(160) * 4 + ")", text)
+        # Replace variable-width tab stops inside True/False parentheses with
+        # exactly four non-breaking spaces, so Word/LibreOffice render equal blanks.
+        for run in p.runs:
+            if run.text and re.search(r"\\([ \\t\\u00a0]*\\)", run.text):
+                run.text = re.sub(r"\\([ \\t\\u00a0]*\\)", "(\\u00a0\\u00a0\\u00a0\\u00a0)", run.text)
     return changed
 
 
