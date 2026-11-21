@@ -99,7 +99,7 @@ def main():
                 if mar is None: mar=OxmlElement("w:tcMar"); tcpr.append(mar)
                 for edge in ("top","start","bottom","end"):
                     node=OxmlElement("w:"+edge); node.set(qn("w:w"),"100"); node.set(qn("w:type"),"dxa"); mar.append(node)
-                set_borders(cell)
+                set_borders(cell._tc)
                 if ri==0:
                     shade(cell._tc,BLUE)
                 for p in cell.paragraphs:
