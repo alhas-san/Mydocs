@@ -45,8 +45,9 @@ class FormatterTests(unittest.TestCase):
         d=Document()
         d.add_paragraph("A. Walking frame B. Blood test C. X-ray film D. Antibiotic")
         reflow_mcq_options(d)
-        self.assertEqual([p.text for p in d.paragraphs],[
-            "A. Walking frame","B. Blood test","C. X-ray film","D. Antibiotic"])
+        self.assertEqual(len(d.paragraphs),2)
+        self.assertEqual(d.paragraphs[0].text.split("\t"),["A. Walking frame","B. Blood test"])
+        self.assertEqual(d.paragraphs[1].text.split("\t"),["C. X-ray film","D. Antibiotic"])
 
     def test_long_choice_does_not_change_uniform_layout(self):
         d=Document()
@@ -80,6 +81,38 @@ class FormatterTests(unittest.TestCase):
         removed=remove_unwanted_page_breaks(d)
         self.assertGreaterEqual(removed,1)
         self.assertFalse(p.paragraph_format.page_break_before)
+
+
+    def test_question_stays_with_its_option_block(self):
+        d=Document()
+        q=d.add_paragraph("Question 1: Choose the correct answer")
+        for value in ("A. Walking frame","B. Blood test","C. X-ray film","D. Antibiotic"):
+            d.add_paragraph(value)
+        reflow_mcq_options(d)
+        self.assertTrue(q.paragraph_format.keep_with_next)
+        self.assertTrue(d.paragraphs[1].paragraph_format.keep_with_next)
+        self.assertFalse(d.paragraphs[2].paragraph_format.keep_with_next)
+
+    def test_section_break_page_start_becomes_continuous(self):
+        d=Document()
+        p=d.add_paragraph("Section")
+        sect=OxmlElement("w:sectPr")
+        typ=OxmlElement("w:type")
+        typ.set(qn("w:val"),"nextPage")
+        sect.append(typ)
+        p._p.get_or_add_pPr().append(sect)
+        removed=remove_unwanted_page_breaks(d)
+        self.assertEqual(removed,1)
+        self.assertEqual(typ.get(qn("w:val")),"continuous")
+
+    def test_mixed_inline_and_separate_options_reflow(self):
+        d=Document()
+        d.add_paragraph("A. First B. Second")
+        d.add_paragraph("C. Third D. Fourth")
+        reflow_mcq_options(d)
+        self.assertEqual(len(d.paragraphs),2)
+        self.assertEqual(d.paragraphs[0].text.split("\t"),["A. First","B. Second"])
+        self.assertEqual(d.paragraphs[1].text.split("\t"),["C. Third","D. Fourth"])
 
 if __name__=="__main__":
     unittest.main()
