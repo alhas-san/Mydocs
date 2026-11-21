@@ -1,10 +1,18 @@
 {
-  "generated_at_utc": "2026-11-20T17:54:20.692449+00:00",
+  "generated_at_utc": "2026-11-21T16:40:27.855964+00:00",
+  "format_profile": "professional_exam_v3",
   "settings": {
-    "remove_graphics": true,
-    "export_pdf": true,
     "font": "Times New Roman",
-    "font_size_pt": 12
+    "body_size_pt": 11,
+    "page": "A4",
+    "margins_cm": {
+      "top": 2.2,
+      "bottom": 2.0,
+      "left": 2.3,
+      "right": 2.0
+    },
+    "page_numbers": "centered_footer",
+    "remove_graphics": true
   },
   "processed": [
     {
@@ -13,10 +21,19 @@
       "docx": "Formatted/Rehabilitation_Engineering_final exam_Formatted.docx",
       "pdf": "Formatted/Rehabilitation_Engineering_final exam_Formatted.pdf",
       "pages": 6,
-      "paragraph_count": 168,
+      "pdf_extracted_characters": 5327,
+      "paragraph_count": 153,
       "nonempty_paragraph_count": 127,
       "text_characters": 6098,
-      "graphics_removed": 51
+      "graphics_removed": 51,
+      "layout_counts": {
+        "opening": 2,
+        "section": 3,
+        "question": 11,
+        "subquestion": 33,
+        "metadata": 0
+      },
+      "table_count": 1
     }
   ],
   "failures": [],
