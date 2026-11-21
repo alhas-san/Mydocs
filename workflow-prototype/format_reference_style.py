@@ -197,7 +197,6 @@ def content_snapshot(doc):
         [[normalize(cell.text) for row in table.rows for cell in row.cells] for table in doc.tables],
         len(doc.inline_shapes),
     )
-    )
 
 def format_exam(source, reference_path, output_prefix):
     if not source.exists(): raise SystemExit(f"Missing source exam: {source}")
