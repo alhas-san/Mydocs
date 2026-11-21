@@ -2,10 +2,12 @@
 """Professional, content-preserving exam formatter."""
 from __future__ import annotations
 import json, re, subprocess, sys, tempfile
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 from docx import Document
+from docx.text.paragraph import Paragraph
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.shared import Cm, Pt
@@ -77,17 +79,8 @@ def parse_options(text):
     return [(labels[i], raw[m.start():matches[i+1].start()].strip() if i+1<len(matches)
              else raw[m.start():].strip()) for i,m in enumerate(matches)]
 
-def options_fit_together(first, second):
-    # Each option occupies one fixed-width column (8.3 cm) on an A4 page.
-    # A conservative character limit prevents either column from wrapping.
-    return len(first)<=38 and len(second)<=38
-
 def reflow_mcq_options(doc):
-    """Use a consistent two-column layout only when every choice is short.
-
-    If even one choice is too long, put every choice on its own line. This
-    avoids the visually inconsistent mixture of paired and single options.
-    """
+    """Put every A-D choice in its own uniformly aligned paragraph."""
     ps=list(doc.paragraphs)
     changed=0
     i=0
@@ -111,21 +104,48 @@ def reflow_mcq_options(doc):
         if expected!=4 or [label for label,_ in collected]!=list("ABCD"):
             i+=1
             continue
-        choice_text=[value for _,value in collected]
-        # Pair all four choices or none: one long choice switches the entire
-        # group to a clean single-column layout.
-        if all(len(value)<=38 for value in choice_text):
-            lines=[choice_text[0]+"\t"+choice_text[1],
-                   choice_text[2]+"\t"+choice_text[3]]
-            ps[i].paragraph_format.tab_stops.add_tab_stop(Cm(8.3))
-        else:
-            lines=choice_text
-        ps[i].text="\n".join(lines)
+        original=ps[i]
+        parent=original._parent
+        anchor=original._p
+        option_paragraphs=[original]
+        for _ in range(3):
+            clone=deepcopy(original._p)
+            anchor.addnext(clone)
+            anchor=clone
+            option_paragraphs.append(Paragraph(clone,parent))
+        for p,(label,value) in zip(option_paragraphs,collected):
+            p.text=value
+            pf=p.paragraph_format
+            pf.left_indent=Cm(0.35)
+            pf.first_line_indent=Cm(0)
+            pf.right_indent=Cm(0)
+            pf.space_before=Pt(0)
+            pf.space_after=Pt(2)
+            pf.keep_together=True
+            pf.keep_with_next=(label!="D")
         for p in remove:
             p._element.getparent().remove(p._element)
-        changed+=len(collected)
+        changed+=4
         i=j
     return changed
+
+def remove_unwanted_page_breaks(doc):
+    """Remove hard page breaks and stale pagination hints from source files."""
+    removed=0
+    for p in all_paragraphs(doc):
+        ppr=p._p.get_or_add_pPr()
+        page_before=ppr.find(qn("w:pageBreakBefore"))
+        if page_before is not None:
+            ppr.remove(page_before)
+            removed+=1
+        for node in list(p._p.iter()):
+            if node.tag==qn("w:lastRenderedPageBreak"):
+                node.getparent().remove(node)
+                removed+=1
+            elif node.tag==qn("w:br") and node.get(qn("w:type"))=="page":
+                node.getparent().remove(node)
+                removed+=1
+    return removed
 
 def remove_graphics(doc):
     count=0; seen=set()
@@ -180,6 +200,7 @@ def page_number(p):
 def format_doc(src,dest):
     doc=Document(str(src)); before=snapshot(doc)
     options_reflowed=reflow_mcq_options(doc)
+    page_breaks_removed=remove_unwanted_page_breaks(doc)
     removed=remove_graphics(doc) if REMOVE_GRAPHICS else 0
     normal=doc.styles["Normal"]; normal.font.name=FONT; normal.font.size=Pt(BODY)
     style_rpr=normal._element.get_or_add_rPr(); style_fonts=style_rpr.rFonts
@@ -205,6 +226,10 @@ def format_doc(src,dest):
         elif kind=="question":
             pf.space_before=Pt(7); pf.space_after=Pt(4); pf.keep_with_next=True; pf.keep_together=True
             for r in p.runs: font(r,BODY,True)
+        elif parse_options(t) and len(parse_options(t))==1:
+            pf.left_indent=Cm(0.35); pf.first_line_indent=Cm(0); pf.keep_together=True
+            pf.keep_with_next=parse_options(t)[0][0]!="D"; pf.space_after=Pt(2)
+            for r in p.runs: font(r,BODY)
         elif kind=="subquestion":
             pf.left_indent=Cm(.45); pf.first_line_indent=Cm(-.2); pf.keep_together=True
             for r in p.runs: font(r,BODY)
@@ -242,7 +267,7 @@ def format_doc(src,dest):
     if before["text"]!=snapshot(doc)["text"]: raise RuntimeError("Text changed during formatting")
     dest.parent.mkdir(parents=True,exist_ok=True); doc.save(dest)
     if before["text"]!=snapshot(Document(dest))["text"]: raise RuntimeError("Saved DOCX text differs from source")
-    return {"paragraph_count":before["paragraphs"],"nonempty_paragraph_count":before["nonempty"],"text_characters":before["characters"],"mcq_options_reflowed":options_reflowed,"graphics_removed":removed,"layout_counts":counts,"table_count":len(doc.tables)}
+    return {"paragraph_count":before["paragraphs"],"nonempty_paragraph_count":before["nonempty"],"text_characters":before["characters"],"mcq_options_reflowed":options_reflowed,"graphics_removed":removed,"page_breaks_removed":page_breaks_removed,"layout_counts":counts,"table_count":len(doc.tables)}
 
 def stem(src): return src.stem+"_Incoming" if src.parent==ROOT/"Incoming" else src.stem
 
@@ -269,7 +294,7 @@ def process(src):
 
 def reports(ok,failed):
     OUTPUT.mkdir(parents=True,exist_ok=True)
-    data={"generated_at_utc":datetime.now(timezone.utc).isoformat(),"format_profile":"professional_exam_v3","settings":{"font":FONT,"body_size_pt":BODY,"page":"A4","margins_cm":{"top":2.2,"bottom":2.0,"left":2.3,"right":2.0},"page_numbers":"centered_footer","remove_graphics":REMOVE_GRAPHICS},"processed":ok,"failures":failed,"summary":{"total":len(ok)+len(failed),"successful":len(ok),"failed":len(failed)}}
+    data={"generated_at_utc":datetime.now(timezone.utc).isoformat(),"format_profile":"professional_exam_v3","settings":{"font":FONT,"body_size_pt":BODY,"page":"A4","margins_cm":{"top":2.2,"bottom":2.0,"left":2.3,"right":2.0},"page_numbers":"centered_footer","remove_graphics":REMOVE_GRAPHICS,"remove_stray_page_breaks":True},"processed":ok,"failures":failed,"summary":{"total":len(ok)+len(failed),"successful":len(ok),"failed":len(failed)}}
     (OUTPUT/"processing_report.json").write_text(json.dumps(data,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     lines=["# Exam processing report","",f"- Generated (UTC): {data['generated_at_utc']}","- Profile: Professional exam v3",f"- Successful: {len(ok)}",f"- Failed: {len(failed)}","- A4 layout, semantic question hierarchy, adaptive MCQ option pairing, table spacing and centered page numbers","","| Source | Status | Pages | Questions | Sections | Tables | Graphics removed |","|---|---:|---:|---:|---:|---:|---:|"]
     for x in ok:
