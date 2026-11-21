@@ -70,10 +70,12 @@ def parse_options(text):
     if not matches or raw[:matches[0].start()].strip():
         return []
     labels=[(m.group(1) or m.group(2)).upper() for m in matches]
-    if labels[0]!="A" or labels!=list("ABCD")[:len(labels)]:
+    sequence=list("ABCD")
+    start=sequence.index(labels[0]) if labels[0] in sequence else -1
+    if start<0 or labels!=sequence[start:start+len(labels)]:
         return []
-    return [raw[m.start():matches[i+1].start()].strip() if i+1<len(matches)
-            else raw[m.start():].strip() for i,m in enumerate(matches)]
+    return [(labels[i], raw[m.start():matches[i+1].start()].strip() if i+1<len(matches)
+             else raw[m.start():].strip()) for i,m in enumerate(matches)]
 
 def options_fit_together(first, second):
     # Conservative line-width estimate for 11 pt Times New Roman on A4 with
@@ -112,7 +114,7 @@ def reflow_mcq_options(doc):
                 lines.append(collected[k]+"\t"+collected[k+1])
                 k+=2
             else:
-                lines.append(collected[k])
+                lines.append(collected[k][1])
                 k+=1
         ps[i].text="\n".join(lines)
         ps[i].paragraph_format.tab_stops.add_tab_stop(Cm(8.2))
