@@ -22,11 +22,11 @@ EXPORT_PDF=True
 FONT="Times New Roman"
 BODY=11
 GRAPHICS={qn("w:drawing"),qn("w:pict"),qn("w:object")}
-QUESTION=re.compile(r"^\s*(?:(?:question|q)\s*\d{1,3}\b|\d{1,3}\s*[\).:-])",re.I)
-SUBQUESTION=re.compile(r"^\s*(?:\([a-z0-9]+\)|[a-z]\s*[\).])",re.I)
-OPTION_MARKER=re.compile(r"(?<!\S)(?:\(([A-D])\)|([A-D])[.)])\s*",re.I)
-SECTION=re.compile(r"^\s*(?:section|part|instructions?|multiple[\s-]+choice|true\s+(?:or|/)\s+false|short[\s-]+answer|essay|answer\s+all|answer\s+the\s+following)\b",re.I)
-META=re.compile(r"^\s*(?:date|time|duration|course|subject|semester|total\s+marks?|maximum\s+marks?|student\s+name|student\s+id|registration\s+no)\s*:",re.I)
+QUESTION=re.compile(r"^\s*(?:(?:question|q)\s*[0-9٠-٩]{1,3}(?=\s|[:.)-]|$)|السؤال\s*[0-9٠-٩]{1,3}(?=\s|[:.)-]|$)|[0-9٠-٩]{1,3}\s*[\).:-])",re.I)
+SUBQUESTION=re.compile(r"^\s*(?:\([a-z0-9أإآابجدد٠-٩]+\)|[a-zأإآابجد]\s*[\).])",re.I)
+OPTION_MARKER=re.compile(r"(?<!\S)(?:\(([A-Da-dأإآابجد])\)|([A-Da-dأإآابجد])[.)])\s*",re.I)
+SECTION=re.compile(r"^\s*(?:section|part|instructions?|multiple[\s-]+choice|true\s+(?:or|/)\s+false|short[\s-]+answer|essay|answer\s+all|answer\s+the\s+following|القسم|الجزء|التعليمات|اختر|صح\s+أو\s+خطأ|أجب\s+عن|أجب\s+على|أكمل)\b",re.I)
+META=re.compile(r"^\s*(?:date|time|duration|course|subject|semester|total\s+marks?|maximum\s+marks?|student\s+name|student\s+id|registration\s+no|التاريخ|الزمن|المدة|المقرر|المادة|الفصل\s+الدراسي|الدرجة\s+الكلية|اسم\s+الطالب|رقم\s+الجلوس|الرقم\s+الجامعي)\s*[:：]",re.I)
 
 def command(args,description):
     r=subprocess.run(args,capture_output=True,text=True)
@@ -65,13 +65,18 @@ def snapshot(doc):
     content=re.sub(r"\s+"," "," ".join(values)).strip()
     return {"paragraphs":len(ps),"nonempty":sum(bool(x.strip()) for x in values),"text":content,"characters":len(content)}
 
+def normalize_option_label(label):
+    """Map Latin or Arabic option labels to the formatter's A-D sequence."""
+    value=label.upper()
+    return {"أ":"A","إ":"A","آ":"A","ا":"A","ب":"B","ج":"C","د":"D"}.get(value,value)
+
 def parse_options(text):
-    """Return sequential A-D choices found at the start of an option paragraph."""
+    """Return sequential A-D choices, accepting Arabic أ/ب/ج/د labels."""
     raw=text.strip()
     matches=list(OPTION_MARKER.finditer(raw))
     if not matches or raw[:matches[0].start()].strip():
         return []
-    labels=[(m.group(1) or m.group(2)).upper() for m in matches]
+    labels=[normalize_option_label(m.group(1) or m.group(2)) for m in matches]
     sequence=list("ABCD")
     start=sequence.index(labels[0]) if labels[0] in sequence else -1
     if start<0 or labels!=sequence[start:start+len(labels)]:
@@ -137,8 +142,10 @@ def reflow_mcq_options(doc):
             anchor.addnext(clone)
             anchor=clone
             option_paragraphs.append(Paragraph(clone,parent))
+        rtl=contains_arabic(original.text)
         for row_index,(p,row) in enumerate(zip(option_paragraphs,rows)):
             p.text=("\t".join(value for _,value in row))
+            set_paragraph_direction(p,rtl)
             pf=p.paragraph_format
             pf.left_indent=Cm(0.35)
             pf.first_line_indent=Cm(0)
@@ -149,7 +156,7 @@ def reflow_mcq_options(doc):
             pf.keep_with_next=(row_index<len(rows)-1)
             pf.tab_stops.clear_all()
             if len(row)==2:
-                pf.tab_stops.add_tab_stop(Cm(8.0),WD_TAB_ALIGNMENT.LEFT)
+                pf.tab_stops.add_tab_stop(Cm(8.0),WD_TAB_ALIGNMENT.RIGHT if rtl else WD_TAB_ALIGNMENT.LEFT)
         # Keep the question stem (and any blank spacer paragraphs immediately
         # before the choices) attached to the first option row.
         previous=original._p.getprevious()
@@ -206,12 +213,34 @@ def remove_graphics(doc):
                 el.getparent().remove(el); count+=1
     return count
 
-def font(run,size=BODY,bold=None):
+def contains_arabic(text):
+    """Detect Arabic-script text without relying on the document language setting."""
+    return any("\u0600" <= ch <= "\u06ff" or "\u0750" <= ch <= "\u077f" or "\u08a0" <= ch <= "\u08ff" for ch in text)
+
+def set_paragraph_direction(p, rtl):
+    """Set Word paragraph bidi direction explicitly for reliable RTL rendering."""
+    ppr=p._p.get_or_add_pPr()
+    bidi=ppr.find(qn("w:bidi"))
+    if rtl:
+        if bidi is None: bidi=OxmlElement("w:bidi"); ppr.append(bidi)
+        bidi.set(qn("w:val"),"1")
+        p.alignment=WD_ALIGN_PARAGRAPH.RIGHT
+    elif bidi is not None:
+        ppr.remove(bidi)
+
+def font(run,size=BODY,bold=None,rtl=False):
     run.font.name=FONT; run.font.size=Pt(size)
     if bold is not None: run.bold=bold
     rpr=run._element.get_or_add_rPr(); rf=rpr.rFonts
     if rf is None: rf=OxmlElement("w:rFonts"); rpr.insert(0,rf)
-    for k in ("ascii","hAnsi","cs","eastAsia"): rf.set(qn(f"w:{k}"),FONT)
+    for k in ("ascii","hAnsi","eastAsia"): rf.set(qn(f"w:{k}"),FONT)
+    rf.set(qn("w:cs"),"Arial" if rtl else FONT)
+    rtl_node=rpr.find(qn("w:rtl"))
+    if rtl:
+        if rtl_node is None: rtl_node=OxmlElement("w:rtl"); rpr.append(rtl_node)
+        rtl_node.set(qn("w:val"),"1")
+    elif rtl_node is not None:
+        rpr.remove(rtl_node)
 
 def classify(p,index):
     t=p.text.strip()
@@ -265,25 +294,27 @@ def format_doc(src,dest):
     for p in ps:
         t=p.text.strip(); kind=classify(p,indexes.get(id(p._p),999))
         pf=p.paragraph_format; pf.space_before=Pt(0); pf.space_after=Pt(5); pf.line_spacing=1.12; pf.widow_control=True
+        rtl=contains_arabic(t)
+        set_paragraph_direction(p,rtl)
         if kind=="opening":
             p.alignment=WD_ALIGN_PARAGRAPH.CENTER; pf.space_after=Pt(3); pf.keep_with_next=True
-            for r in p.runs: font(r,15 if len(t)<100 else 12,True)
+            for r in p.runs: font(r,15 if len(t)<100 else 12,True,rtl=rtl)
         elif kind=="section":
             pf.space_before=Pt(10); pf.space_after=Pt(5); pf.keep_with_next=True; pf.keep_together=True
-            for r in p.runs: font(r,12,True)
+            for r in p.runs: font(r,12,True,rtl=rtl)
         elif kind=="question":
             pf.space_before=Pt(7); pf.space_after=Pt(4); pf.keep_with_next=True; pf.keep_together=True
-            for r in p.runs: font(r,BODY,True)
+            for r in p.runs: font(r,BODY,True,rtl=rtl)
         elif parse_options(t) and len(parse_options(t))==1:
             pf.left_indent=Cm(0.35); pf.first_line_indent=Cm(0); pf.keep_together=True
             pf.keep_with_next=parse_options(t)[0][0]!="D"; pf.space_after=Pt(2)
-            for r in p.runs: font(r,BODY)
+            for r in p.runs: font(r,BODY,rtl=rtl)
         elif kind=="subquestion":
             pf.left_indent=Cm(.45); pf.first_line_indent=Cm(-.2); pf.keep_together=True
             for r in p.runs: font(r,BODY)
         elif kind=="metadata":
             pf.space_after=Pt(3)
-            for r in p.runs: font(r,10,True)
+            for r in p.runs: font(r,10,True,rtl=rtl)
         else:
             for r in p.runs: font(r,BODY)
         if kind in counts: counts[kind]+=1
@@ -307,7 +338,9 @@ def format_doc(src,dest):
                     tcpr=cell._tc.get_or_add_tcPr(); shade=OxmlElement("w:shd"); shade.set(qn("w:fill"),"E9EEF4"); tcpr.append(shade)
                 for p in cell.paragraphs:
                     p.paragraph_format.space_after=Pt(2); p.paragraph_format.line_spacing=1.0
-                    for r in p.runs: font(r,BODY,bold=(ri==0 and len(table.rows)>1) or r.bold)
+                    cell_rtl=contains_arabic(" ".join(p.text for p in cell.paragraphs))
+                    set_paragraph_direction(p,cell_rtl)
+                    for r in p.runs: font(r,BODY,bold=(ri==0 and len(table.rows)>1) or r.bold,rtl=cell_rtl)
     for sec in doc.sections:
         p=sec.footer.paragraphs[0]
         if not p.text.strip(): page_number(p)
