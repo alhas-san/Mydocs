@@ -16,7 +16,6 @@ concurrency:
   cancel-in-progress: false
 jobs:
   analytical-chemistry-reference:
-    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.modified, ','), 'Analytical_Chemistry_I_Formatted.docx') || contains(join(github.event.commits.*.modified, ','), 'workflow-prototype/') || contains(join(github.event.commits.*.modified, ','), '.github/workflows/reference-style-prototype.yml')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -45,7 +44,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   rehabilitation-engineering-reference:
-    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.modified, ','), 'Rehabilitation_Engineering_final exam.doc') || contains(join(github.event.commits.*.modified, ','), 'workflow-prototype/') || contains(join(github.event.commits.*.modified, ','), '.github/workflows/reference-style-prototype.yml')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
