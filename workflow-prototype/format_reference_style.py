@@ -211,12 +211,18 @@ def reflow_inline_options(doc):
 def apply_option_spacing(doc):
     """Give every MCQ option a consistent readable gap in the rendered document."""
     changed = 0
-    for p in all_paragraphs(doc):
+    paragraphs = all_paragraphs(doc)
+    for index, p in enumerate(paragraphs):
         paragraph_role = role(p.text)
-        if paragraph_role == "question":
-            # Keep a question stem with at least the first following paragraph.
+        next_is_option = (
+            index + 1 < len(paragraphs)
+            and role(paragraphs[index + 1].text) == "option"
+        )
+        # Many legacy exams store the question stem without its number in the
+        # same paragraph. Keep any non-empty stem directly before an option
+        # paragraph with its first option, preventing a stranded stem at page end.
+        if paragraph_role == "question" or (p.text.strip() and next_is_option):
             p.paragraph_format.keep_with_next = True
-            continue
         if paragraph_role != "option":
             continue
         fmt = p.paragraph_format
