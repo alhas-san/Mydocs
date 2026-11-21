@@ -35,9 +35,9 @@ class FormatterTests(unittest.TestCase):
         d=Document()
         for value in (
             "A. Improve quality of life and independence of people with disabilities",
-            "B. Replace all clinical professionals",
-            "C. Study only electrical circuits",
-            "D. Diagnose infectious diseases",
+            "B. Replace all clinical professionals with a complete automated engineering system",
+            "C. Study only electrical circuits and laboratory measurement procedures",
+            "D. Diagnose infectious diseases using clinical and laboratory investigations",
         ):
             d.add_paragraph(value)
         reflow_mcq_options(d)
