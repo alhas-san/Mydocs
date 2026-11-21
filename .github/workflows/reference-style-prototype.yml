@@ -76,3 +76,5 @@ jobs:
           retention-days: 14
 
 # Re-run formatting validation against the latest option-layout implementation.
+
+# Trigger validation after fixing the formatter's escaped-newline syntax error.
