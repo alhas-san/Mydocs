@@ -79,7 +79,7 @@ jobs:
           git add Formatted/
           if ! git diff --cached --quiet; then
             git commit -m "Apply professional exam formatting profile"
-            git pull --rebase origin main
+            git pull --rebase -X theirs origin main
             git push
           else
             echo "No new formatted documents or reports."
