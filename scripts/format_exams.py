@@ -22,7 +22,7 @@ EXPORT_PDF=True
 FONT="Times New Roman"
 BODY=11
 GRAPHICS={qn("w:drawing"),qn("w:pict"),qn("w:object")}
-QUESTION=re.compile(r"^\s*(?:(?:question|q)\s*[0-9٠-٩]{1,3}(?=\s|[:.)-]|$)|السؤال\s*[0-9٠-٩]{1,3}(?=\s|[:.)-]|$)|[0-9٠-٩]{1,3}\s*[\).:-])",re.I)
+QUESTION=re.compile(r"^\s*(?:(?:question|q)\s*[0-9٠-٩]{1,3}(?=\s|[:.)-]|$)|(?:السؤال|سؤال)\s*(?:[0-9٠-٩]{1,3}|الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر)(?=\s|[:.)-]|$)|[0-9٠-٩]{1,3}\s*[\).:-])",re.I)
 SUBQUESTION=re.compile(r"^\s*(?:\([a-z0-9أإآابجدد٠-٩]+\)|[a-zأإآابجد]\s*[\).])",re.I)
 OPTION_MARKER=re.compile(r"(?<!\S)(?:\(([A-Da-dأإآابجد])\)|([A-Da-dأإآابجد])[.)])\s*",re.I)
 SECTION=re.compile(r"^\s*(?:section|part|instructions?|multiple[\s-]+choice|true\s+(?:or|/)\s+false|short[\s-]+answer|essay|answer\s+all|answer\s+the\s+following|القسم|الجزء|التعليمات|اختر|صح\s+أو\s+خطأ|أجب\s+عن|أجب\s+على|أكمل)\b",re.I)
