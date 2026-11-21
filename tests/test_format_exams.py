@@ -2,7 +2,7 @@ import unittest
 from tempfile import TemporaryDirectory
 from pathlib import Path
 from docx import Document
-from scripts.format_exams import classify, format_doc, snapshot, reflow_mcq_options
+from scripts.format_exams import classify, format_doc, snapshot, reflow_mcq_options, remove_unwanted_page_breaks
 
 class FormatterTests(unittest.TestCase):
     def test_semantic_classification(self):
@@ -21,63 +21,59 @@ class FormatterTests(unittest.TestCase):
             before=snapshot(Document(src))["text"]; format_doc(src,dst)
             self.assertEqual(before,snapshot(Document(dst))["text"])
 
-    def test_short_mcq_options_are_paired(self):
+    def test_mcq_options_each_get_uniform_paragraphs(self):
         d=Document()
         for value in ("A. Walking frame","B. Blood test","C. X-ray film","D. Antibiotic"):
             d.add_paragraph(value)
         before=snapshot(d)["text"]
         self.assertEqual(reflow_mcq_options(d),4)
-        self.assertEqual(len(d.paragraphs),1)
-        self.assertEqual(d.paragraphs[0].text,"A. Walking frame\tB. Blood test\nC. X-ray film\tD. Antibiotic")
+        self.assertEqual([p.text for p in d.paragraphs],[
+            "A. Walking frame","B. Blood test","C. X-ray film","D. Antibiotic"])
+        for p in d.paragraphs:
+            self.assertEqual(p.paragraph_format.left_indent.cm,0.35)
+            self.assertEqual(p.paragraph_format.first_line_indent.cm,0)
+            self.assertTrue(p.paragraph_format.keep_together)
+        self.assertTrue(d.paragraphs[0].paragraph_format.keep_with_next)
+        self.assertFalse(d.paragraphs[3].paragraph_format.keep_with_next)
         self.assertEqual(before,snapshot(d)["text"])
 
-    def test_long_mcq_options_stay_on_separate_lines(self):
-        d=Document()
-        for value in (
-            "A. Improve quality of life and independence of people with disabilities",
-            "B. Replace all clinical professionals with a complete automated engineering system",
-            "C. Study only electrical circuits and laboratory measurement procedures",
-            "D. Diagnose infectious diseases using clinical and laboratory investigations",
-        ):
-            d.add_paragraph(value)
-        reflow_mcq_options(d)
-        self.assertEqual(len(d.paragraphs),1)
-        self.assertNotIn("\t",d.paragraphs[0].text)
-        self.assertEqual(len(d.paragraphs[0].text.splitlines()),4)
-
-    def test_inline_mcq_options_are_split_and_paired(self):
+    def test_inline_mcq_options_become_four_paragraphs(self):
         d=Document()
         d.add_paragraph("A. Walking frame B. Blood test C. X-ray film D. Antibiotic")
         reflow_mcq_options(d)
-        self.assertEqual(d.paragraphs[0].text,"A. Walking frame\tB. Blood test\nC. X-ray film\tD. Antibiotic")
+        self.assertEqual([p.text for p in d.paragraphs],[
+            "A. Walking frame","B. Blood test","C. X-ray film","D. Antibiotic"])
 
-    def test_one_long_choice_forces_all_choices_onto_separate_lines(self):
+    def test_long_choice_does_not_change_uniform_layout(self):
         d=Document()
         for value in (
             "A. Short",
-            "B. This is the one long answer choice that cannot fit in the second column",
+            "B. This is the one long answer choice that wraps across several lines",
             "C. Also short",
             "D. Short too",
         ):
             d.add_paragraph(value)
         reflow_mcq_options(d)
-        text=d.paragraphs[0].text
-        self.assertNotIn("\t",text)
-        self.assertEqual(text.splitlines(),[
-            "A. Short",
-            "B. This is the one long answer choice that cannot fit in the second column",
-            "C. Also short",
-            "D. Short too",
-        ])
+        self.assertEqual(len(d.paragraphs),4)
+        self.assertTrue(all(p.paragraph_format.keep_together for p in d.paragraphs))
 
-    def test_short_options_use_one_fixed_column_tab_stop(self):
+    def test_inline_and_separate_options_can_be_combined(self):
         d=Document()
-        for value in ("A. Yes","B. No","C. Maybe","D. None"):
-            d.add_paragraph(value)
+        d.add_paragraph("A. One B. Two")
+        d.add_paragraph("C. Three")
+        d.add_paragraph("D. Four")
         reflow_mcq_options(d)
-        p=d.paragraphs[0]
-        self.assertEqual(p.text,"A. Yes\tB. No\nC. Maybe\tD. None")
-        self.assertEqual(len(p.paragraph_format.tab_stops),1)
+        self.assertEqual([p.text for p in d.paragraphs],[
+            "A. One","B. Two","C. Three","D. Four"])
+
+    def test_removes_manual_page_breaks(self):
+        d=Document()
+        p=d.add_paragraph("Question")
+        p.paragraph_format.page_break_before=True
+        p.add_run().add_break(7)
+        removed=remove_unwanted_page_breaks(d)
+        self.assertGreaterEqual(removed,1)
+        self.assertFalse(p.paragraph_format.page_break_before)
 
 if __name__=="__main__":
     unittest.main()
