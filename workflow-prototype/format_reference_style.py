@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "workflow-prototype/output"
 OPTION_RE = re.compile(r"^\s*[A-D]\s*[.)]")
 QUESTION_RE = re.compile(r"^\s*\d+\s*[.)]")
-SECTION_RE = re.compile(r"^(?:Question\s*\(\s*\d+\s*\)|Section\s+[A-Z0-9]+)", re.I)
+SECTION_RE = re.compile(r"^(?:Question\s*\(?\s*\d+\s*\)?|Section\s+[A-Z0-9]+)", re.I)
 
 def role(text):
     t = text.strip()
