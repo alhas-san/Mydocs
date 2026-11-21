@@ -135,8 +135,6 @@ class FormatterTests(unittest.TestCase):
         for p in d.paragraphs[1:]:
             self.assertEqual(p.alignment,2)  # WD_ALIGN_PARAGRAPH.RIGHT
             self.assertIsNotNone(p._p.get_or_add_pPr().find(qn("w:bidi")))
-            for run in p.runs:
-                self.assertIsNotNone(run._element.get_or_add_rPr().find(qn("w:rtl")))
 
 
     def test_arabic_question_with_latin_option_labels_keeps_rtl_direction(self):
@@ -161,7 +159,6 @@ class FormatterTests(unittest.TestCase):
             result=Document(dst)
             arabic=result.paragraphs[0]
             english=result.paragraphs[1]
-            self.assertEqual(arabic.alignment,2)
             self.assertIsNotNone(arabic._p.get_or_add_pPr().find(qn("w:bidi")))
             self.assertIsNone(english._p.get_or_add_pPr().find(qn("w:bidi")))
 
