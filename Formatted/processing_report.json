@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-11-21T18:14:48.820006+00:00",
+  "generated_at_utc": "2026-11-21T18:22:35.088243+00:00",
   "format_profile": "professional_exam_v3",
   "settings": {
     "font": "Times New Roman",
@@ -37,12 +37,34 @@
         "metadata": 0
       },
       "table_count": 1
+    },
+    {
+      "source": "��Computer Networks basics  Final Exam.docx",
+      "status": "success",
+      "docx": "Formatted/��Computer Networks basics  Final Exam_Formatted.docx",
+      "pdf": "Formatted/��Computer Networks basics  Final Exam_Formatted.pdf",
+      "pages": 7,
+      "pdf_extracted_characters": 6899,
+      "paragraph_count": 181,
+      "nonempty_paragraph_count": 129,
+      "text_characters": 7786,
+      "mcq_options_reflowed": 0,
+      "graphics_removed": 0,
+      "page_breaks_removed": 0,
+      "layout_counts": {
+        "opening": 3,
+        "section": 11,
+        "question": 24,
+        "subquestion": 1,
+        "metadata": 0
+      },
+      "table_count": 4
     }
   ],
   "failures": [],
   "summary": {
-    "total": 1,
-    "successful": 1,
+    "total": 2,
+    "successful": 2,
     "failed": 0
   }
 }
