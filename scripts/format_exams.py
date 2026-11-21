@@ -24,7 +24,7 @@ BODY=11
 GRAPHICS={qn("w:drawing"),qn("w:pict"),qn("w:object")}
 QUESTION=re.compile(r"^\s*(?:(?:question|q)\s*[0-9٠-٩]{1,3}(?=\s|[:.)-]|$)|(?:السؤال|سؤال)\s*(?:[0-9٠-٩]{1,3}|الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر)(?=\s|[:.)-]|$)|[0-9٠-٩]{1,3}\s*[\).:-])",re.I)
 SUBQUESTION=re.compile(r"^\s*(?:\([a-z0-9أإآابجدد٠-٩]+\)|[a-zأإآابجد]\s*[\).])",re.I)
-OPTION_MARKER=re.compile(r"(?<!\S)(?:\(([A-Da-dأإآابجد])\)|([A-Da-dأإآابجد])[.)])\s*",re.I)
+OPTION_MARKER=re.compile(r"(?<!\S)(?:\(([A-Da-dأإآابجد])\)|([A-Da-dأإآابجد])[-.)])\s*",re.I)
 SECTION=re.compile(r"^\s*(?:section|part|instructions?|multiple[\s-]+choice|true\s+(?:or|/)\s+false|short[\s-]+answer|essay|answer\s+all|answer\s+the\s+following|القسم|الجزء|التعليمات|اختر|صح\s+أو\s+خطأ|أجب\s+عن|أجب\s+على|أكمل)\b",re.I)
 META=re.compile(r"^\s*(?:date|time|duration|course|subject|semester|total\s+marks?|maximum\s+marks?|student\s+name|student\s+id|registration\s+no|التاريخ|الزمن|المدة|المقرر|المادة|الفصل\s+الدراسي|الدرجة\s+الكلية|اسم\s+الطالب|رقم\s+الجلوس|الرقم\s+الجامعي)\s*[:：]",re.I)
 
@@ -142,7 +142,15 @@ def reflow_mcq_options(doc):
             anchor.addnext(clone)
             anchor=clone
             option_paragraphs.append(Paragraph(clone,parent))
-        rtl=contains_arabic(original.text)
+        direction_text=original.text
+        previous=original._p.getprevious()
+        while previous is not None:
+            previous_para=Paragraph(previous,parent)
+            if previous_para.text.strip():
+                direction_text += " " + previous_para.text
+                break
+            previous=previous.getprevious()
+        rtl=contains_arabic(direction_text)
         for row_index,(p,row) in enumerate(zip(option_paragraphs,rows)):
             p.text=("\t".join(value for _,value in row))
             set_paragraph_direction(p,rtl)
