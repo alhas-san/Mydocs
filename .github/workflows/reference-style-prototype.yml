@@ -1,0 +1,42 @@
+name: Reference-style exam workflow prototype
+on:
+  push:
+    branches:
+      - "prototype/reference-exam-workflow"
+    paths:
+      - "workflow-prototype/**"
+      - ".github/workflows/reference-style-prototype.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: reference-style-prototype
+  cancel-in-progress: false
+jobs:
+  prototype:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install LibreOffice and PDF tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice poppler-utils fonts-noto-core
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install document dependency
+        run: python -m pip install --upgrade pip "python-docx>=1.1,<2"
+      - name: Generate reference-style mockup
+        run: python workflow-prototype/format_reference_style.py
+      - name: Render first pages for visual inspection
+        run: |
+          mkdir -p workflow-prototype/output/previews
+          pdftoppm -f 1 -l 3 -png -r 120 workflow-prototype/output/Marketing_Principles_Reference_Style.pdf workflow-prototype/output/previews/page
+      - name: Upload prototype only (no repository commit)
+        uses: actions/upload-artifact@v5
+        with:
+          name: marketing-exam-reference-style-prototype
+          path: workflow-prototype/output/
+          if-no-files-found: error
+          retention-days: 14
