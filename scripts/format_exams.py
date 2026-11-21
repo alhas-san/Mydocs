@@ -56,8 +56,12 @@ def all_paragraphs(doc):
     return result
 
 def snapshot(doc):
-    ps=all_paragraphs(doc); values=[p.text for p in ps]
-    return {"paragraphs":len(ps),"nonempty":sum(bool(x.strip()) for x in values),"text":"\n".join(values),"characters":sum(map(len,values))}
+    ps=all_paragraphs(doc); values=[]
+    for p in ps:
+        # Generated page-number fields are layout metadata, not source exam text.
+        has_page_field=any(el.tag==qn("w:instrText") and "PAGE" in (el.text or "").upper() for el in p._p.iter())
+        if not has_page_field: values.append(p.text)
+    return {"paragraphs":len(values),"nonempty":sum(bool(x.strip()) for x in values),"text":"\n".join(values),"characters":sum(map(len,values))}
 
 def remove_graphics(doc):
     count=0; seen=set()
@@ -147,13 +151,25 @@ def format_doc(src,dest):
         if kind in counts: counts[kind]+=1
     for table in doc.tables:
         table.autofit=True
-        for row in table.rows:
+        table.alignment=1
+        tblpr=table._tbl.tblPr
+        borders=tblpr.first_child_found_in("w:tblBorders")
+        if borders is None: borders=OxmlElement("w:tblBorders"); tblpr.append(borders)
+        for edge in ("top","left","bottom","right","insideH","insideV"):
+            node=borders.find(qn("w:"+edge))
+            if node is None: node=OxmlElement("w:"+edge); borders.append(node)
+            node.set(qn("w:val"),"single"); node.set(qn("w:sz"),"6"); node.set(qn("w:space"),"0"); node.set(qn("w:color"),"AAB4C0")
+        for ri,row in enumerate(table.rows):
             trpr=row._tr.get_or_add_trPr(); trpr.append(OxmlElement("w:cantSplit"))
+            if ri==0 and len(table.rows)>1:
+                repeat=OxmlElement("w:tblHeader"); repeat.set(qn("w:val"),"true"); trpr.append(repeat)
             for cell in row.cells:
                 cell.vertical_alignment=WD_CELL_VERTICAL_ALIGNMENT.CENTER; cell_margins(cell)
+                if ri==0 and len(table.rows)>1:
+                    tcpr=cell._tc.get_or_add_tcPr(); shade=OxmlElement("w:shd"); shade.set(qn("w:fill"),"E9EEF4"); tcpr.append(shade)
                 for p in cell.paragraphs:
                     p.paragraph_format.space_after=Pt(2); p.paragraph_format.line_spacing=1.0
-                    for r in p.runs: font(r,BODY)
+                    for r in p.runs: font(r,BODY,bold=(ri==0 and len(table.rows)>1) or r.bold)
     for sec in doc.sections:
         p=sec.footer.paragraphs[0]
         if not p.text.strip(): page_number(p)
@@ -188,9 +204,9 @@ def process(src):
 
 def reports(ok,failed):
     OUTPUT.mkdir(parents=True,exist_ok=True)
-    data={"generated_at_utc":datetime.now(timezone.utc).isoformat(),"format_profile":"professional_exam_v2","settings":{"font":FONT,"body_size_pt":BODY,"page":"A4","margins_cm":{"top":2.2,"bottom":2.0,"left":2.3,"right":2.0},"page_numbers":"centered_footer","remove_graphics":REMOVE_GRAPHICS},"processed":ok,"failures":failed,"summary":{"total":len(ok)+len(failed),"successful":len(ok),"failed":len(failed)}}
+    data={"generated_at_utc":datetime.now(timezone.utc).isoformat(),"format_profile":"professional_exam_v3","settings":{"font":FONT,"body_size_pt":BODY,"page":"A4","margins_cm":{"top":2.2,"bottom":2.0,"left":2.3,"right":2.0},"page_numbers":"centered_footer","remove_graphics":REMOVE_GRAPHICS},"processed":ok,"failures":failed,"summary":{"total":len(ok)+len(failed),"successful":len(ok),"failed":len(failed)}}
     (OUTPUT/"processing_report.json").write_text(json.dumps(data,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    lines=["# Exam processing report","",f"- Generated (UTC): {data['generated_at_utc']}","- Profile: Professional exam v2",f"- Successful: {len(ok)}",f"- Failed: {len(failed)}","- A4 layout, semantic question hierarchy, table spacing and centered page numbers","","| Source | Status | Pages | Questions | Sections | Tables | Graphics removed |","|---|---:|---:|---:|---:|---:|---:|"]
+    lines=["# Exam processing report","",f"- Generated (UTC): {data['generated_at_utc']}","- Profile: Professional exam v3",f"- Successful: {len(ok)}",f"- Failed: {len(failed)}","- A4 layout, semantic question hierarchy, table spacing and centered page numbers","","| Source | Status | Pages | Questions | Sections | Tables | Graphics removed |","|---|---:|---:|---:|---:|---:|---:|"]
     for x in ok:
         c=x["layout_counts"]; lines.append(f"| `{x['source']}` | OK | {x['pages']} | {c['question']} | {c['section']} | {x['table_count']} | {x['graphics_removed']} |")
         lines.append(f"  - DOCX: `{x['docx']}`"); lines.append(f"  - PDF: `{x['pdf']}`")
