@@ -118,7 +118,7 @@ def remove_forced_page_breaks(doc):
 def option_chunks(paragraph):
     """Split a source paragraph containing inline A./B./C./D. options into option texts."""
     text = paragraph.text
-    matches = list(re.finditer(r"(?<![A-Za-z0-9])([A-D])\\s*[.)]\\s*", text))
+    matches = list(re.finditer(r"(?<![A-Za-z0-9])([A-D])\s*[.)]\s*", text))
     if len(matches) < 2:
         return []
     chunks = []
@@ -191,10 +191,12 @@ def reflow_inline_options(doc):
     return changed
 
 def content_snapshot(doc):
+    normalize = lambda value: re.sub(r"\s+", " ", value).strip()
     return (
-        [p.text for p in doc.paragraphs],
-        [[cell.text for row in table.rows for cell in row.cells] for table in doc.tables],
+        [normalize(p.text) for p in doc.paragraphs],
+        [[normalize(cell.text) for row in table.rows for cell in row.cells] for table in doc.tables],
         len(doc.inline_shapes),
+    )
     )
 
 def format_exam(source, reference_path, output_prefix):
@@ -208,6 +210,7 @@ def format_exam(source, reference_path, output_prefix):
         reference, samples, fallback = build_profile(reference_path)
         transfer_styles(reference, doc)
         remove_forced_page_breaks(doc)
+        option_paragraphs = reflow_inline_options(doc)
 
         # Match page geometry from the reference document, but preserve the source's
         # section structure and content. Continuous sections avoid accidental blank pages.
