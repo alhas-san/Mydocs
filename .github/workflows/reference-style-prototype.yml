@@ -7,6 +7,9 @@ on:
       - "workflow-prototype/**"
       - "Analytical_Chemistry_I_Formatted.docx"
       - "Rehabilitation_Engineering_final exam.doc"
+      - "*.doc"
+      - "*.docx"
+      - "Incoming/**"
       - ".github/workflows/reference-style-prototype.yml"
   workflow_dispatch:
 permissions:
@@ -78,3 +81,69 @@ jobs:
 # Re-run formatting validation against the latest option-layout implementation.
 
 # Trigger validation after fixing the formatter's escaped-newline syntax error.
+
+
+  format-all-uploaded-exams:
+    name: Format every uploaded exam with editable academic header
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install LibreOffice and PDF tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice poppler-utils fonts-noto-core
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install document dependency
+        run: python -m pip install --upgrade pip "python-docx>=1.1,<2"
+      - name: Format every uploaded Word exam
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(
+            find . -maxdepth 1 -type f \( -iname '*.doc' -o -iname '*.docx' \) \
+              ! -name 'Analytical_Chemistry_I_Formatted.docx' -print0
+            if [ -d Incoming ]; then
+              find Incoming -type f \( -iname '*.doc' -o -iname '*.docx' \) -print0
+            fi
+          )
+          if [ "\${#files[@]}" -eq 0 ]; then
+            echo "No uploaded exam documents found."
+            exit 0
+          fi
+          for file in "\${files[@]}"; do
+            relative="\${file#./}"
+            base="$(basename "$file")"
+            stem="\${base%.*}"
+            if [[ "$relative" == Incoming/* ]]; then
+              stem="Incoming_\${stem}"
+            fi
+            prefix="$(printf '%s' "$stem" | tr -cs '[:alnum:]_.-' '_')"
+            echo "Formatting: $relative"
+            python workflow-prototype/format_reference_style.py \
+              --input "$relative" \
+              --reference "Analytical_Chemistry_I_Formatted.docx" \
+              --output-prefix "$prefix"
+          done
+      - name: Render first three pages of every uploaded exam
+        if: always()
+        run: |
+          mkdir -p workflow-prototype/output/previews/uploaded
+          for file in workflow-prototype/output/*.pdf; do
+            [ -f "$file" ] || continue
+            name="$(basename "$file" .pdf)"
+            pdftoppm -f 1 -l 3 -png -r 110 "$file" "workflow-prototype/output/previews/uploaded/$name-page" || true
+          done
+      - name: Upload automatically formatted exams
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: automatically-formatted-uploaded-exams
+          path: |
+            workflow-prototype/output/*.docx
+            workflow-prototype/output/*.pdf
+            workflow-prototype/output/previews/uploaded/
+          if-no-files-found: warn
+          retention-days: 14
