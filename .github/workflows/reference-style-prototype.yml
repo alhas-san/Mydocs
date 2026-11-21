@@ -137,13 +137,32 @@ jobs:
             pdftoppm -f 1 -l 3 -png -r 110 "$file" "workflow-prototype/output/previews/uploaded/$name-page" || true
           done
       - name: Upload automatically formatted exams
-        if: always()
+        id: upload_exams
+        if: success()
         uses: actions/upload-artifact@v5
         with:
-          name: automatically-formatted-uploaded-exams
+          name: formatted-exams-download
           path: |
             workflow-prototype/output/*.docx
             workflow-prototype/output/*.pdf
-            workflow-prototype/output/previews/uploaded/
-          if-no-files-found: warn
-          retention-days: 14
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish simple download instructions
+        if: success()
+        shell: bash
+        env:
+          ARTIFACT_URL: ${{ steps.upload_exams.outputs.artifact-url }}
+        run: |
+          {
+            echo "# Your formatted exams are ready"
+            echo
+            echo "## [Download all formatted exams (Word + PDF)]($ARTIFACT_URL)"
+            echo
+            echo "The download contains the editable Word files and print-ready PDF files."
+            echo "On a phone, download the ZIP and extract it using your Files app."
+            echo
+            echo "Files are available for 30 days after this workflow run."
+            echo
+            echo "[Open this workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } >> "$GITHUB_STEP_SUMMARY"
