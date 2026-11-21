@@ -6,6 +6,7 @@ on:
     paths:
       - "workflow-prototype/**"
       - "Analytical_Chemistry_I_Formatted.docx"
+      - "Rehabilitation_Engineering_final exam.doc"
       - ".github/workflows/reference-style-prototype.yml"
   workflow_dispatch:
 permissions:
@@ -14,7 +15,8 @@ concurrency:
   group: reference-style-prototype
   cancel-in-progress: false
 jobs:
-  prototype:
+  analytical-chemistry-reference:
+    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.modified, ','), 'Analytical_Chemistry_I_Formatted.docx') || contains(join(github.event.commits.*.modified, ','), 'workflow-prototype/')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -29,16 +31,48 @@ jobs:
       - name: Install document dependency
         run: python -m pip install --upgrade pip "python-docx>=1.1,<2"
       - name: Generate Analytical Chemistry reference-style mockup
-        run: python workflow-prototype/format_reference_style.py
+        run: python workflow-prototype/format_reference_style.py --input "Analytical_Chemistry_I_Formatted.docx" --output-prefix "Analytical_Chemistry_Reference_Style"
       - name: Render every page for visual inspection
         run: |
-          mkdir -p workflow-prototype/output/previews
+          mkdir -p workflow-prototype/output/previews/analytical-chemistry
           pdfinfo workflow-prototype/output/Analytical_Chemistry_Reference_Style.pdf
-          pdftoppm -png -r 120 workflow-prototype/output/Analytical_Chemistry_Reference_Style.pdf workflow-prototype/output/previews/page
-      - name: Upload prototype only (no repository commit)
+          pdftoppm -png -r 120 workflow-prototype/output/Analytical_Chemistry_Reference_Style.pdf workflow-prototype/output/previews/analytical-chemistry/page
+      - name: Upload Analytical Chemistry prototype
         uses: actions/upload-artifact@v5
         with:
           name: analytical-chemistry-reference-style-prototype
-          path: workflow-prototype/output/
+          path: workflow-prototype/output/Analytical_Chemistry_Reference_Style.*
+          if-no-files-found: error
+          retention-days: 14
+  rehabilitation-engineering-reference:
+    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.modified, ','), 'Rehabilitation_Engineering_final exam.doc') || contains(join(github.event.commits.*.modified, ','), 'workflow-prototype/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install LibreOffice and PDF tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice poppler-utils fonts-noto-core
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install document dependency
+        run: python -m pip install --upgrade pip "python-docx>=1.1,<2"
+      - name: Convert legacy DOC, then apply reference style
+        run: python workflow-prototype/format_reference_style.py --input "Rehabilitation_Engineering_final exam.doc" --output-prefix "Rehabilitation_Engineering_Reference_Style"
+      - name: Render every page for visual inspection
+        run: |
+          mkdir -p workflow-prototype/output/previews/rehabilitation-engineering
+          pdfinfo workflow-prototype/output/Rehabilitation_Engineering_Reference_Style.pdf
+          pdftoppm -png -r 120 workflow-prototype/output/Rehabilitation_Engineering_Reference_Style.pdf workflow-prototype/output/previews/rehabilitation-engineering/page
+      - name: Upload Rehabilitation Engineering prototype
+        uses: actions/upload-artifact@v5
+        with:
+          name: rehabilitation-engineering-reference-style-prototype
+          path: |
+            workflow-prototype/output/Rehabilitation_Engineering_Reference_Style.docx
+            workflow-prototype/output/Rehabilitation_Engineering_Reference_Style.pdf
+            workflow-prototype/output/previews/rehabilitation-engineering/
           if-no-files-found: error
           retention-days: 14
