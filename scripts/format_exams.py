@@ -22,6 +22,7 @@ BODY=11
 GRAPHICS={qn("w:drawing"),qn("w:pict"),qn("w:object")}
 QUESTION=re.compile(r"^\s*(?:(?:question|q)\s*\d{1,3}\b|\d{1,3}\s*[\).:-])",re.I)
 SUBQUESTION=re.compile(r"^\s*(?:\([a-z0-9]+\)|[a-z]\s*[\).])",re.I)
+OPTION_MARKER=re.compile(r"(?<!\S)(?:\(([A-D])\)|([A-D])[.)])\s*",re.I)
 SECTION=re.compile(r"^\s*(?:section|part|instructions?|multiple[\s-]+choice|true\s+(?:or|/)\s+false|short[\s-]+answer|essay|answer\s+all|answer\s+the\s+following)\b",re.I)
 META=re.compile(r"^\s*(?:date|time|duration|course|subject|semester|total\s+marks?|maximum\s+marks?|student\s+name|student\s+id|registration\s+no)\s*:",re.I)
 
@@ -56,10 +57,70 @@ def all_paragraphs(doc):
     return result
 
 def snapshot(doc):
-    # Compare exam-body content (including nested table cells), not generated
-    # headers/footers such as the page-number field added by this formatter.
+    # Compare actual wording while allowing intentional paragraph/line-break
+    # changes made by the MCQ layout pass.
     ps=list(paragraphs(doc)); values=[p.text for p in ps]
-    return {"paragraphs":len(ps),"nonempty":sum(bool(x.strip()) for x in values),"text":"\n".join(values),"characters":sum(map(len,values))}
+    content=re.sub(r"\s+"," "," ".join(values)).strip()
+    return {"paragraphs":len(ps),"nonempty":sum(bool(x.strip()) for x in values),"text":content,"characters":len(content)}
+
+def parse_options(text):
+    """Return sequential A-D choices found at the start of an option paragraph."""
+    raw=text.strip()
+    matches=list(OPTION_MARKER.finditer(raw))
+    if not matches or raw[:matches[0].start()].strip():
+        return []
+    labels=[(m.group(1) or m.group(2)).upper() for m in matches]
+    if labels[0]!="A" or labels!=list("ABCD")[:len(labels)]:
+        return []
+    return [raw[m.start():matches[i+1].start()].strip() if i+1<len(matches)
+            else raw[m.start():].strip() for i,m in enumerate(matches)]
+
+def options_fit_together(first, second):
+    # Conservative line-width estimate for 11 pt Times New Roman on A4 with
+    # the configured margins. The limit leaves room for the tab separator.
+    return len(first)<=42 and len(second)<=42 and len(first)+len(second)+4<=86
+
+def reflow_mcq_options(doc):
+    """Place short MCQ choices in pairs; keep long choices on separate lines."""
+    ps=list(doc.paragraphs)
+    changed=0
+    i=0
+    while i<len(ps):
+        choices=parse_options(ps[i].text)
+        if not choices:
+            i+=1
+            continue
+        collected=list(choices)
+        remove=[]
+        expected=len(collected)
+        j=i+1
+        while expected<4 and j<len(ps):
+            following=parse_options(ps[j].text)
+            if len(following)!=1 or following[0][0]!=list("ABCD")[expected]:
+                break
+            collected.extend(following)
+            remove.append(ps[j])
+            expected+=1
+            j+=1
+        if len(collected)<2:
+            i+=1
+            continue
+        lines=[]
+        k=0
+        while k<len(collected):
+            if k+1<len(collected) and options_fit_together(collected[k],collected[k+1]):
+                lines.append(collected[k]+"\t"+collected[k+1])
+                k+=2
+            else:
+                lines.append(collected[k])
+                k+=1
+        ps[i].text="\n".join(lines)
+        ps[i].paragraph_format.tab_stops.add_tab_stop(Cm(8.2))
+        for p in remove:
+            p._element.getparent().remove(p._element)
+        changed+=len(collected)
+        i=j
+    return changed
 
 def remove_graphics(doc):
     count=0; seen=set()
@@ -113,6 +174,7 @@ def page_number(p):
 
 def format_doc(src,dest):
     doc=Document(str(src)); before=snapshot(doc)
+    options_reflowed=reflow_mcq_options(doc)
     removed=remove_graphics(doc) if REMOVE_GRAPHICS else 0
     normal=doc.styles["Normal"]; normal.font.name=FONT; normal.font.size=Pt(BODY)
     style_rpr=normal._element.get_or_add_rPr(); style_fonts=style_rpr.rFonts
@@ -175,7 +237,7 @@ def format_doc(src,dest):
     if before["text"]!=snapshot(doc)["text"]: raise RuntimeError("Text changed during formatting")
     dest.parent.mkdir(parents=True,exist_ok=True); doc.save(dest)
     if before["text"]!=snapshot(Document(dest))["text"]: raise RuntimeError("Saved DOCX text differs from source")
-    return {"paragraph_count":before["paragraphs"],"nonempty_paragraph_count":before["nonempty"],"text_characters":before["characters"],"graphics_removed":removed,"layout_counts":counts,"table_count":len(doc.tables)}
+    return {"paragraph_count":before["paragraphs"],"nonempty_paragraph_count":before["nonempty"],"text_characters":before["characters"],"mcq_options_reflowed":options_reflowed,"graphics_removed":removed,"layout_counts":counts,"table_count":len(doc.tables)}
 
 def stem(src): return src.stem+"_Incoming" if src.parent==ROOT/"Incoming" else src.stem
 
@@ -204,7 +266,7 @@ def reports(ok,failed):
     OUTPUT.mkdir(parents=True,exist_ok=True)
     data={"generated_at_utc":datetime.now(timezone.utc).isoformat(),"format_profile":"professional_exam_v3","settings":{"font":FONT,"body_size_pt":BODY,"page":"A4","margins_cm":{"top":2.2,"bottom":2.0,"left":2.3,"right":2.0},"page_numbers":"centered_footer","remove_graphics":REMOVE_GRAPHICS},"processed":ok,"failures":failed,"summary":{"total":len(ok)+len(failed),"successful":len(ok),"failed":len(failed)}}
     (OUTPUT/"processing_report.json").write_text(json.dumps(data,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    lines=["# Exam processing report","",f"- Generated (UTC): {data['generated_at_utc']}","- Profile: Professional exam v3",f"- Successful: {len(ok)}",f"- Failed: {len(failed)}","- A4 layout, semantic question hierarchy, table spacing and centered page numbers","","| Source | Status | Pages | Questions | Sections | Tables | Graphics removed |","|---|---:|---:|---:|---:|---:|---:|"]
+    lines=["# Exam processing report","",f"- Generated (UTC): {data['generated_at_utc']}","- Profile: Professional exam v3",f"- Successful: {len(ok)}",f"- Failed: {len(failed)}","- A4 layout, semantic question hierarchy, adaptive MCQ option pairing, table spacing and centered page numbers","","| Source | Status | Pages | Questions | Sections | Tables | Graphics removed |","|---|---:|---:|---:|---:|---:|---:|"]
     for x in ok:
         c=x["layout_counts"]; lines.append(f"| `{x['source']}` | OK | {x['pages']} | {c['question']} | {c['section']} | {x['table_count']} | {x['graphics_removed']} |")
         lines.append(f"  - DOCX: `{x['docx']}`"); lines.append(f"  - PDF: `{x['pdf']}`")
