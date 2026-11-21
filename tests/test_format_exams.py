@@ -5,7 +5,7 @@ from docx import Document
 from docx.enum.text import WD_BREAK
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from scripts.format_exams import classify, format_doc, snapshot, reflow_mcq_options, remove_unwanted_page_breaks
+from scripts.format_exams import classify, format_doc, snapshot, reflow_mcq_options, remove_unwanted_page_breaks, parse_options
 
 class FormatterTests(unittest.TestCase):
     def test_semantic_classification(self):
@@ -113,6 +113,46 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(len(d.paragraphs),2)
         self.assertEqual(d.paragraphs[0].text.split("\t"),["A. First","B. Second"])
         self.assertEqual(d.paragraphs[1].text.split("\t"),["C. Third","D. Fourth"])
+
+
+    def test_arabic_question_and_section_classification(self):
+        d=Document()
+        self.assertEqual(classify(d.add_paragraph("السؤال ١: عرّف المصطلح"),9),"question")
+        self.assertEqual(classify(d.add_paragraph("سؤال الثاني: أجب عن الآتي"),9),"question")
+        self.assertEqual(classify(d.add_paragraph("القسم الثاني"),9),"section")
+        self.assertEqual(classify(d.add_paragraph("اسم الطالب: أحمد"),9),"metadata")
+
+    def test_arabic_option_labels_are_recognized_and_reflowed_rtl(self):
+        d=Document()
+        d.add_paragraph("السؤال ١: اختر الإجابة الصحيحة")
+        for value in ("أ. المشي","ب. الجري","ج. السباحة","د. القفز"):
+            d.add_paragraph(value)
+        self.assertEqual([x[0] for x in parse_options("أ. المشي ب. الجري ج. السباحة د. القفز")],list("ABCD"))
+        self.assertEqual(reflow_mcq_options(d),4)
+        self.assertEqual(len(d.paragraphs),3)
+        self.assertEqual(d.paragraphs[1].text.split("\t"),["أ. المشي","ب. الجري"])
+        self.assertEqual(d.paragraphs[2].text.split("\t"),["ج. السباحة","د. القفز"])
+        for p in d.paragraphs[1:]:
+            self.assertEqual(p.alignment,2)  # WD_ALIGN_PARAGRAPH.RIGHT
+            self.assertIsNotNone(p._p.get_or_add_pPr().find(qn("w:bidi")))
+            for run in p.runs:
+                self.assertIsNotNone(run._element.get_or_add_rPr().find(qn("w:rtl")))
+
+    def test_arabic_document_paragraphs_are_rtl_but_english_remains_ltr(self):
+        with TemporaryDirectory() as tmp:
+            src=Path(tmp)/"arabic.docx"; dst=Path(tmp)/"formatted.docx"
+            d=Document()
+            d.add_paragraph("كلية العلوم والتكنولوجيا")
+            d.add_paragraph("Question 1: Explain the process")
+            d.save(src)
+            format_doc(src,dst)
+            result=Document(dst)
+            arabic=result.paragraphs[0]
+            english=result.paragraphs[1]
+            self.assertEqual(arabic.alignment,2)
+            self.assertIsNotNone(arabic._p.get_or_add_pPr().find(qn("w:bidi")))
+            self.assertIsNone(english._p.get_or_add_pPr().find(qn("w:bidi")))
+
 
 if __name__=="__main__":
     unittest.main()
