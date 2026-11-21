@@ -6,7 +6,7 @@ from collections import Counter
 import zipfile, os
 from lxml import etree
 from docx import Document
-from docx.shared import Cm, Pt, RGBColor
+from docx.shared import Cm, Pt, Inches, RGBColor
 from docx.enum.section import WD_SECTION_START
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml import OxmlElement
@@ -447,6 +447,54 @@ def apply_reference_header(reference_path, output_docx, exam_title):
     os.replace(temp_output, output_docx)
 
 
+
+def apply_page_number_footer(doc):
+    """Add a compact centered PAGE field to every page, including first pages."""
+    def write_page_field(footer):
+        footer.is_linked_to_previous = False
+        p = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+        for child in list(p._p):
+            if child.tag != qn("w:pPr"):
+                p._p.remove(child)
+        p.alignment = 1
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        p.paragraph_format.line_spacing = 1.0
+        run = p.add_run()
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(8)
+        begin = OxmlElement("w:fldChar")
+        begin.set(qn("w:fldCharType"), "begin")
+        instr = OxmlElement("w:instrText")
+        instr.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+        instr.text = " PAGE "
+        separate = OxmlElement("w:fldChar")
+        separate.set(qn("w:fldCharType"), "separate")
+        displayed = OxmlElement("w:t")
+        displayed.text = "1"
+        end = OxmlElement("w:fldChar")
+        end.set(qn("w:fldCharType"), "end")
+        for element in (begin, instr, separate, displayed, end):
+            field_run = OxmlElement("w:r")
+            rpr = OxmlElement("w:rPr")
+            fonts = OxmlElement("w:rFonts")
+            fonts.set(qn("w:ascii"), "Times New Roman")
+            fonts.set(qn("w:hAnsi"), "Times New Roman")
+            rpr.append(fonts)
+            size = OxmlElement("w:sz")
+            size.set(qn("w:val"), "16")
+            rpr.append(size)
+            field_run.append(rpr)
+            field_run.append(element)
+            p._p.append(field_run)
+
+    for section in doc.sections:
+        section.footer_distance = Inches(0.20)
+        section.different_first_page_header_footer = True
+        write_page_field(section.footer)
+        write_page_field(section.first_page_footer)
+
+
 def format_exam(source, reference_path, output_prefix, exam_title=None):
     if not source.exists(): raise SystemExit(f"Missing source exam: {source}")
     if not reference_path.exists(): raise SystemExit(f"Missing reference exam: {reference_path}")
@@ -496,6 +544,7 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
         if before != after:
             raise RuntimeError("Content-preservation check failed: paragraph/table text or inline shape count changed")
 
+        apply_page_number_footer(doc)
         output_docx = OUT / f"{output_prefix}.docx"
         doc.save(output_docx)
         inferred_title = exam_title or re.sub(r"\b(?:final|midterm|main)?\s*exam(?:ination)?\b", "", re.sub(r"[_-]+", " ", source.stem), flags=re.I).strip().title()
