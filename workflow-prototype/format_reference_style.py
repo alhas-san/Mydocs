@@ -63,12 +63,27 @@ def convert_legacy_doc(source, tempdir):
     if not converted.exists(): raise RuntimeError("LibreOffice did not produce a DOCX from the legacy DOC source")
     return converted
 
+def remove_forced_page_breaks(doc):
+    """Let content paginate naturally; legacy DOC imports often carry stale hard breaks."""
+    paragraphs = list(doc.paragraphs)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                paragraphs.extend(cell.paragraphs)
+    for p in paragraphs:
+        p.paragraph_format.page_break_before = False
+        for node in list(p._p.xpath(".//w:br[@w:type='page'] | .//w:lastRenderedPageBreak")):
+            parent = node.getparent()
+            if parent is not None:
+                parent.remove(node)
+
 def format_exam(source, output_prefix):
     if not source.exists(): raise SystemExit(f"Missing source exam: {source}")
     OUT.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         working_source = convert_legacy_doc(source, tmp) if source.suffix.lower() == ".doc" else source
         doc = Document(working_source)
+        remove_forced_page_breaks(doc)
 
         # Match the reference's clean A4 geometry while retaining source content and objects.
         for sec in doc.sections:
