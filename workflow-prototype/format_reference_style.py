@@ -372,9 +372,9 @@ def apply_reference_header(reference_path, output_docx, exam_title):
         program_parent.insert(program_index, _make_dropdown("academic-program", "Select Program", program_choices, 71001, program_run.find(_w("rPr"))))
 
         level_run_properties = level_run.find(_w("rPr"))
-        _replace_run_with_dropdown(level_semester_p, "2nd", _make_dropdown("academic-level", "Select Level", [x + " Level" for x in level_choices], 71002, level_run_properties))
+        _replace_run_with_dropdown(level_semester_p, "2nd", _make_dropdown("academic-level", "Select Level", level_choices, 71002, level_run_properties))
         semester_run_properties = semester_run.find(_w("rPr"))
-        _replace_run_with_dropdown(level_semester_p, "3rd", _make_dropdown("academic-semester", "Select Semester", [x + " Semester" for x in semester_choices], 71003, semester_run_properties))
+        _replace_run_with_dropdown(level_semester_p, "3rd", _make_dropdown("academic-semester", "Select Semester", semester_choices, 71003, semester_run_properties))
 
         # The exam title is per-document; do not carry the reference subject into another exam.
         for run in title_p.xpath("./w:r", namespaces=ns):
