@@ -9,6 +9,7 @@ on:
       - "Incoming/*.doc"
       - "Incoming/*.docx"
       - "scripts/format_exams.py"
+      - "scripts/review_exam_documents.py"
       - "tests/**"
       - ".github/workflows/format-exams.yml"
 
