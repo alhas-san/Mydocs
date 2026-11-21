@@ -89,7 +89,7 @@ def reflow_mcq_options(doc):
     i=0
     while i<len(ps):
         choices=parse_options(ps[i].text)
-        if not choices:
+        if not choices or choices[0][0]!="A":
             i+=1
             continue
         collected=list(choices)
