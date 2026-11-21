@@ -176,14 +176,18 @@ class FormatterTests(unittest.TestCase):
             format_doc(src,dst)
             result=Document(dst)
             arabic_title_run=result.paragraphs[0].runs[0]
-            arabic_body_run=result.paragraphs[1].runs[0]
-            english_run=result.paragraphs[2].runs[0]
+            arabic_metadata_run=result.paragraphs[1].runs[0]
+            arabic_question_run=result.paragraphs[2].runs[0]
+            arabic_body_run=result.paragraphs[3].runs[0]
+            english_run=result.paragraphs[4].runs[0]
             title_fonts=arabic_title_run._element.get_or_add_rPr().rFonts
             body_fonts=arabic_body_run._element.get_or_add_rPr().rFonts
             english_fonts=english_run._element.get_or_add_rPr().rFonts
             self.assertEqual(title_fonts.get(qn("w:cs")),"Traditional Arabic")
             self.assertEqual(title_fonts.get(qn("w:ascii")),"Calibri")
             self.assertEqual(arabic_title_run.font.size.pt,18)  # 15 pt title + Arabic adjustment
+            self.assertEqual(arabic_metadata_run.font.size.pt,13)  # 10 pt metadata + Arabic adjustment
+            self.assertEqual(arabic_question_run.font.size.pt,14)  # 11 pt question + Arabic adjustment
             self.assertEqual(body_fonts.get(qn("w:cs")),"Traditional Arabic")
             self.assertEqual(arabic_body_run.font.size.pt,14)  # 11 pt body + Arabic adjustment
             self.assertEqual(english_fonts.get(qn("w:ascii")),"Calibri")
