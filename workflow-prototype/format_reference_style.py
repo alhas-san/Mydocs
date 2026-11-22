@@ -646,19 +646,28 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
                 trpr = row._tr.get_or_add_trPr()
                 if trpr.find(qn("w:cantSplit")) is None:
                     trpr.append(OxmlElement("w:cantSplit"))
-                # Treat the first row as a table heading: repeat it on later pages
-                # and keep it attached to the first data row. This prevents
-                # LibreOffice/Word from leaving a lonely heading at page bottom.
-                if row_index == 0:
-                    if trpr.find(qn("w:tblHeader")) is None:
-                        header_flag = OxmlElement("w:tblHeader")
-                        header_flag.set(qn("w:val"), "true")
-                        trpr.append(header_flag)
-                    for cell in row.cells:
-                        for paragraph in cell.paragraphs:
-                            paragraph.paragraph_format.keep_with_next = True
+                # Repeat the first row when a table continues on another page.
+                # Do not apply keep-with-next inside this row: LibreOffice can
+                # interpret that as keeping the entire table together, pushing
+                # it wholesale onto the next page and leaving a large blank area.
+                if row_index == 0 and trpr.find(qn("w:tblHeader")) is None:
+                    header_flag = OxmlElement("w:tblHeader")
+                    header_flag.set(qn("w:val"), "true")
+                    trpr.append(header_flag)
                 for cell in row.cells:
                     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+        # Keep each table's immediately preceding question heading/instructions
+        # with the table. Stop at a blank paragraph so unrelated sections are not
+        # chained together. This prevents orphaned question headings at page ends.
+        for table in doc.tables:
+            node = table._tbl.getprevious()
+            while node is not None and node.tag == qn("w:p"):
+                paragraph = Paragraph(node, doc)
+                if not paragraph.text.strip():
+                    break
+                paragraph.paragraph_format.keep_with_next = True
+                node = node.getprevious()
 
         after = content_snapshot(doc)
         if before != after:
