@@ -244,3 +244,5 @@ jobs:
               )
           print(f"Successfully emailed {len(files)} files to {recipient}.")
           PY
+
+# Trigger a fresh validation of Arabic and mixed-language paragraph direction.
