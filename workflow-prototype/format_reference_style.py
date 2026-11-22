@@ -700,6 +700,38 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
             paragraph.paragraph_format.keep_together = True
             paragraph.paragraph_format.keep_with_next = False
 
+        # Attach a nearby question heading/instructions to the first row of a
+        # following table. Ignore intervening blank spacer paragraphs, but only
+        # search a short distance (max 5 non-empty paragraphs) so a later answer
+        # grid is not accidentally attached to every question in a section.
+        body_children = list(doc.element.body)
+        for table in doc.tables:
+            table_index = body_children.index(table._tbl)
+            candidate_nodes = []
+            nonempty_count = 0
+            found_heading = False
+            cursor = table_index - 1
+            while cursor >= 0:
+                node = body_children[cursor]
+                if node.tag != qn("w:p"):
+                    break
+                paragraph = Paragraph(node, doc)
+                candidate_nodes.append(node)
+                if paragraph.text.strip():
+                    nonempty_count += 1
+                    if role(paragraph.text) in {"question", "section"}:
+                        found_heading = True
+                        break
+                    if nonempty_count >= 5:
+                        break
+                cursor -= 1
+            if found_heading:
+                # Link only the short question block and the first table row.
+                # Table rows themselves are not chained, so long tables still
+                # split cleanly between complete rows.
+                for node in reversed(candidate_nodes):
+                    Paragraph(node, doc).paragraph_format.keep_with_next = True
+
         after = content_snapshot(doc)
         if before != after:
             raise RuntimeError("Content-preservation check failed: paragraph/table text or inline shape count changed")
