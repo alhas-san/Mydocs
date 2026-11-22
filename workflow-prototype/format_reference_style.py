@@ -658,17 +658,41 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
                 for cell in row.cells:
                     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
-        # Keep each table's immediately preceding question heading/instructions
-        # with the table. Stop at a blank paragraph so unrelated sections are not
-        # chained together. This prevents orphaned question headings at page ends.
-        for table in doc.tables:
-            node = table._tbl.getprevious()
-            while node is not None and node.tag == qn("w:p"):
-                paragraph = Paragraph(node, doc)
-                if not paragraph.text.strip():
+        # Pagination policy:
+        # 1) Never chain a whole table to the paragraph before it. LibreOffice may
+        #    treat that chain as one indivisible block and push a long table to the
+        #    next page, leaving most of the previous page empty.
+        # 2) Keep a question heading attached to its own instruction paragraph(s),
+        #    but end the chain before the table. The table can then flow naturally
+        #    between pages while individual rows remain indivisible (cantSplit)
+        #    and its first row repeats as a header (tblHeader).
+        # 3) Keep each question/answer paragraph together; keep question stems
+        #    attached to the first answer paragraph via apply_option_spacing().
+        body_children = list(doc.element.body)
+        for index, node in enumerate(body_children):
+            if node.tag != qn("w:p"):
+                continue
+            paragraph = Paragraph(node, doc)
+            if role(paragraph.text) not in {"question", "section"}:
+                continue
+            next_index = index + 1
+            while next_index < len(body_children):
+                next_node = body_children[next_index]
+                # Stop at a table: do not attach a complete table to its heading.
+                if next_node.tag == qn("w:tbl"):
+                    break
+                if next_node.tag != qn("w:p"):
+                    break
+                next_paragraph = Paragraph(next_node, doc)
+                if not next_paragraph.text.strip():
                     break
                 paragraph.paragraph_format.keep_with_next = True
-                node = node.getprevious()
+                paragraph = next_paragraph
+                next_index += 1
+            # Keep the final instruction paragraph intact, but allow the following
+            # table to paginate independently.
+            paragraph.paragraph_format.keep_together = True
+            paragraph.paragraph_format.keep_with_next = False
 
         after = content_snapshot(doc)
         if before != after:
