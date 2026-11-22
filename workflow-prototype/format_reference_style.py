@@ -29,7 +29,10 @@ def role(text):
     if OPTION_RE.match(t): return "option"
     if ARABIC_QUESTION_RE.match(t) and ARABIC_RE.search(t): return "question"
     if ARABIC_SECTION_RE.match(t) and ARABIC_RE.search(t): return "section"
-    if SECTION_RE.match(t) or re.match(r"^(?:Part|Section)\s+[A-Z0-9]+", t, re.I): return "section"
+    if (SECTION_RE.match(t)
+            or re.match(r"^Question\s+(?:One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten)\b", t, re.I)
+            or re.match(r"^(?:Part|Section)\s+[A-Z0-9]+", t, re.I)):
+        return "section"
     if QUESTION_RE.match(t): return "question"
     if re.search(r"Program:|Level:|Semester:|Date:|Time:|Name:|Department:|Course:", t, re.I): return "metadata"
     if re.search(r"Main Examination|Final Examination|Mid.?term Examination", t, re.I): return "exam_title"
