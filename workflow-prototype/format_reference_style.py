@@ -222,6 +222,7 @@ def apply_option_spacing(doc):
     changed = 0
     paragraphs = all_paragraphs(doc)
     for index, p in enumerate(paragraphs):
+        inside_table_cell = p._p.getparent() is not None and p._p.getparent().tag == qn("w:tc")
         paragraph_role = role(p.text)
         next_role = role(paragraphs[index + 1].text) if index + 1 < len(paragraphs) else "empty"
         has_inline_image = bool(p._p.xpath(".//w:drawing | .//w:pict"))
@@ -233,10 +234,11 @@ def apply_option_spacing(doc):
         # Keep section headings, numbered stems, and each option row attached.
         # Chaining keep_with_next across A/B/C/D keeps the entire option set
         # with its question rather than allowing the last options to spill.
-        if paragraph_role in {"section", "question"} or (p.text.strip() and next_role == "option"):
-            p.paragraph_format.keep_with_next = True
-        if paragraph_role == "option" and next_role == "option":
-            p.paragraph_format.keep_with_next = True
+        if not inside_table_cell:
+            if paragraph_role in {"section", "question"} or (p.text.strip() and next_role == "option"):
+                p.paragraph_format.keep_with_next = True
+            if paragraph_role == "option" and next_role == "option":
+                p.paragraph_format.keep_with_next = True
         if p.text.strip() and next_has_inline_image:
             p.paragraph_format.keep_with_next = True
         if has_inline_image:
@@ -280,6 +282,10 @@ def apply_arabic_layout(doc):
             continue
         arabic_paragraphs += 1
         paragraph_role = role(paragraph_text)
+        # Numbered statements inside table cells are table rows, not standalone
+        # question headings. Treat them as body text so they do not chain rows.
+        if p._p.getparent() is not None and p._p.getparent().tag == qn("w:tc") and paragraph_role == "question":
+            paragraph_role = "body"
         arabic_count = len(ARABIC_RE.findall(paragraph_text))
         latin_count = len(re.findall(r"[A-Za-z]", paragraph_text))
         arabic_dominant = arabic_count >= latin_count
