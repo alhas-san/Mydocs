@@ -246,3 +246,4 @@ jobs:
           PY
 
 # Trigger a fresh validation of Arabic and mixed-language paragraph direction.
+# Trigger validation after keeping question instructions with their tables without chaining entire tables.
