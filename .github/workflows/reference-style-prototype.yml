@@ -1,4 +1,4 @@
-name: Analytical Chemistry reference-style prototype
+name: Analytical Chemistry reference-style prototype # pagination import fix validation
 on:
   push:
     branches:
