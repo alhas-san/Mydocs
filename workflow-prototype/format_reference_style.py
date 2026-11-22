@@ -14,14 +14,19 @@ from docx.oxml.ns import qn
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "workflow-prototype/output"
-OPTION_RE = re.compile(r"^\s*[A-D]\s*[.)]")
-QUESTION_RE = re.compile(r"^\s*\d+\s*[.)]")
+OPTION_RE = re.compile(r"^\s*(?:[A-D]|[أابجدهو])\s*[.)、:：-]")
+QUESTION_RE = re.compile(r"^\s*[0-9٠-٩]+\s*[.)、:：-]")
+ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]")
+ARABIC_QUESTION_RE = re.compile(r"^\s*(?:السؤال|سؤال)\s*(?:رقم\s*)?(?:[0-9٠-٩]+|الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر)?", re.I)
+ARABIC_SECTION_RE = re.compile(r"^\s*(?:القسم|الجزء|أجب عن|أجيبي عن|اختر|ضع علامة)", re.I)
 SECTION_RE = re.compile(r"^(?:Question\s*\(?\s*\d+\s*\)?|Section\s+[A-Z0-9]+)", re.I)
 
 def role(text):
     t = text.strip()
     if not t: return "empty"
     if OPTION_RE.match(t): return "option"
+    if ARABIC_QUESTION_RE.match(t) and ARABIC_RE.search(t): return "question"
+    if ARABIC_SECTION_RE.match(t) and ARABIC_RE.search(t): return "section"
     if SECTION_RE.match(t) or re.match(r"^(?:Part|Section)\s+[A-Z0-9]+", t, re.I): return "section"
     if QUESTION_RE.match(t): return "question"
     if re.search(r"Program:|Level:|Semester:|Date:|Time:|Name:|Department:|Course:", t, re.I): return "metadata"
@@ -257,6 +262,79 @@ def apply_option_spacing(doc):
                 if runs[run_index - 1].text.strip().endswith("(") and runs[run_index + 1].text.strip().startswith(")"):
                     run.text = "    "
     return changed
+
+
+
+def apply_arabic_layout(doc):
+    """Apply a dedicated Naskh-style, RTL layout only to Arabic paragraphs."""
+    arabic_paragraphs = 0
+    arabic_questions = 0
+    arabic_options = 0
+    for p in all_paragraphs(doc):
+        if not ARABIC_RE.search(p.text or ""):
+            continue
+        arabic_paragraphs += 1
+        paragraph_role = role(p.text)
+        fmt = p.paragraph_format
+        fmt.alignment = 2
+        fmt.left_indent = Cm(0)
+        fmt.right_indent = Cm(0)
+        fmt.first_line_indent = Cm(0)
+        fmt.line_spacing = 1.25
+        fmt.widow_control = True
+
+        ppr = p._p.get_or_add_pPr()
+        bidi = ppr.find(qn("w:bidi"))
+        if bidi is None:
+            bidi = OxmlElement("w:bidi")
+            ppr.append(bidi)
+        bidi.set(qn("w:val"), "1")
+
+        if paragraph_role == "question":
+            fmt.space_before = Pt(9)
+            fmt.space_after = Pt(5)
+            fmt.keep_with_next = True
+            fmt.keep_together = True
+            arabic_questions += 1
+        elif paragraph_role == "option":
+            fmt.space_before = Pt(2)
+            fmt.space_after = Pt(5)
+            fmt.keep_together = True
+            arabic_options += 1
+        elif paragraph_role == "section":
+            fmt.space_before = Pt(10)
+            fmt.space_after = Pt(7)
+            fmt.keep_with_next = True
+        else:
+            fmt.space_before = Pt(3)
+            fmt.space_after = Pt(6)
+
+        for run in p.runs:
+            if not run.text or not ARABIC_RE.search(run.text):
+                continue
+            run.font.name = "Noto Naskh Arabic"
+            run.font.size = Pt(16 if paragraph_role in {"question", "section"} else 15)
+            rpr = run._r.get_or_add_rPr()
+            rfonts = rpr.find(qn("w:rFonts"))
+            if rfonts is None:
+                rfonts = OxmlElement("w:rFonts")
+                rpr.insert(0, rfonts)
+            for key in ("ascii", "hAnsi", "eastAsia", "cs"):
+                rfonts.set(qn("w:" + key), "Noto Naskh Arabic")
+            rtl = rpr.find(qn("w:rtl"))
+            if rtl is None:
+                rtl = OxmlElement("w:rtl")
+                rpr.append(rtl)
+            rtl.set(qn("w:val"), "1")
+            if paragraph_role == "section":
+                run.bold = True
+    print(
+        "Arabic layout: "
+        f"{arabic_paragraphs} paragraphs, {arabic_questions} questions, "
+        f"{arabic_options} answer options; right-to-left Noto Naskh Arabic"
+    )
+    return arabic_paragraphs, arabic_questions, arabic_options
+
 
 
 def content_snapshot(doc):
@@ -529,6 +607,7 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
             for run in p.runs:
                 if run.text: apply_font(run, spec)
         spaced_option_paragraphs = apply_option_spacing(doc)
+        arabic_layout_stats = apply_arabic_layout(doc)
         # Preserve tables and their existing geometry; transfer reference table style
         # only where a matching named style exists.
         for table in doc.tables:
