@@ -171,7 +171,6 @@ jobs:
         if: success()
         shell: bash
         env:
-          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
@@ -179,8 +178,8 @@ jobs:
           EMAIL_TO: Alhassan@taibah.edu.sd
         run: |
           set -euo pipefail
-          if [[ -z "$SMTP_SERVER" || -z "$SMTP_USERNAME" || -z "$SMTP_PASSWORD" ]]; then
-            echo "Email delivery is not configured yet. Add SMTP_SERVER, SMTP_USERNAME and SMTP_PASSWORD in the repository Actions secrets to enable automatic delivery." >> "$GITHUB_STEP_SUMMARY"
+          if [[ -z "$SMTP_USERNAME" || -z "$SMTP_PASSWORD" ]]; then
+            echo "Email delivery is not configured yet. Add SMTP_USERNAME and SMTP_PASSWORD in the repository Actions secrets to enable automatic delivery." >> "$GITHUB_STEP_SUMMARY"
             echo "::notice::Email delivery skipped because SMTP credentials are not configured."
             exit 0
           fi
@@ -197,7 +196,8 @@ jobs:
           recipient = os.environ["EMAIL_TO"]
           username = os.environ["SMTP_USERNAME"]
           sender = os.environ.get("SMTP_FROM") or username
-          port = int(os.environ.get("SMTP_PORT") or "587")
+          smtp_host = "smtp.gmail.com"
+          port = 587
           files = sorted(
               glob.glob("workflow-prototype/output/*.docx")
               + glob.glob("workflow-prototype/output/*.pdf")
@@ -229,7 +229,8 @@ jobs:
               )
 
           context = ssl.create_default_context()
-          with smtplib.SMTP(os.environ["SMTP_SERVER"], port, timeout=30) as server:
+          print(f"Connecting to Gmail SMTP ({smtp_host}:{port})...")
+          with smtplib.SMTP(smtp_host, port, timeout=30) as server:
               server.ehlo()
               server.starttls(context=context)
               server.ehlo()
