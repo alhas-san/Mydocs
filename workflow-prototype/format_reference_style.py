@@ -6,6 +6,7 @@ from collections import Counter
 import zipfile, os
 from lxml import etree
 from docx import Document
+from docx.text.paragraph import Paragraph
 from docx.shared import Cm, Pt, Inches, RGBColor
 from docx.enum.section import WD_SECTION_START
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
