@@ -642,10 +642,21 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
         # only where a matching named style exists.
         for table in doc.tables:
             table.alignment = WD_TABLE_ALIGNMENT.CENTER
-            for row in table.rows:
+            for row_index, row in enumerate(table.rows):
                 trpr = row._tr.get_or_add_trPr()
                 if trpr.find(qn("w:cantSplit")) is None:
                     trpr.append(OxmlElement("w:cantSplit"))
+                # Treat the first row as a table heading: repeat it on later pages
+                # and keep it attached to the first data row. This prevents
+                # LibreOffice/Word from leaving a lonely heading at page bottom.
+                if row_index == 0:
+                    if trpr.find(qn("w:tblHeader")) is None:
+                        header_flag = OxmlElement("w:tblHeader")
+                        header_flag.set(qn("w:val"), "true")
+                        trpr.append(header_flag)
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            paragraph.paragraph_format.keep_with_next = True
                 for cell in row.cells:
                     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
