@@ -267,72 +267,101 @@ def apply_option_spacing(doc):
 
 
 def apply_arabic_layout(doc):
-    """Apply a dedicated Naskh-style, RTL layout only to Arabic paragraphs."""
+    """Format Arabic text without forcing English-led mixed paragraphs into RTL layout."""
     arabic_paragraphs = 0
     arabic_questions = 0
     arabic_options = 0
+    rtl_paragraphs = 0
+    mixed_paragraphs = 0
     for p in all_paragraphs(doc):
-        if not ARABIC_RE.search(p.text or ""):
+        paragraph_text = p.text or ""
+        if not ARABIC_RE.search(paragraph_text):
             continue
         arabic_paragraphs += 1
-        paragraph_role = role(p.text)
+        paragraph_role = role(paragraph_text)
+        arabic_count = len(ARABIC_RE.findall(paragraph_text))
+        latin_count = len(re.findall(r"[A-Za-z]", paragraph_text))
+        arabic_dominant = arabic_count >= latin_count
         fmt = p.paragraph_format
-        fmt.alignment = 2
-        fmt.left_indent = Cm(0)
-        fmt.right_indent = Cm(0)
-        fmt.first_line_indent = Cm(0)
-        fmt.line_spacing = 1.25
-        fmt.widow_control = True
 
         ppr = p._p.get_or_add_pPr()
         bidi = ppr.find(qn("w:bidi"))
-        if bidi is None:
-            bidi = OxmlElement("w:bidi")
-            ppr.append(bidi)
-        bidi.set(qn("w:val"), "1")
-
-        if paragraph_role == "question":
-            fmt.space_before = Pt(9)
-            fmt.space_after = Pt(5)
-            fmt.keep_with_next = True
-            fmt.keep_together = True
-            arabic_questions += 1
-        elif paragraph_role == "option":
-            fmt.space_before = Pt(2)
-            fmt.space_after = Pt(5)
-            fmt.keep_together = True
-            arabic_options += 1
-        elif paragraph_role == "section":
-            fmt.space_before = Pt(10)
-            fmt.space_after = Pt(7)
-            fmt.keep_with_next = True
+        if arabic_dominant:
+            rtl_paragraphs += 1
+            fmt.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            fmt.left_indent = Cm(0)
+            fmt.right_indent = Cm(0)
+            fmt.first_line_indent = Cm(0)
+            fmt.line_spacing = 1.25
+            fmt.widow_control = True
+            if bidi is None:
+                bidi = OxmlElement("w:bidi")
+                ppr.append(bidi)
+            bidi.set(qn("w:val"), "1")
         else:
-            fmt.space_before = Pt(3)
-            fmt.space_after = Pt(6)
+            mixed_paragraphs += 1
+            # Keep English-led bilingual lines in their original LTR layout.
+            fmt.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            if bidi is not None:
+                ppr.remove(bidi)
+
+        if arabic_dominant:
+            if paragraph_role == "question":
+                fmt.space_before = Pt(9)
+                fmt.space_after = Pt(5)
+                fmt.keep_with_next = True
+                fmt.keep_together = True
+                arabic_questions += 1
+            elif paragraph_role == "option":
+                fmt.space_before = Pt(2)
+                fmt.space_after = Pt(5)
+                fmt.keep_together = True
+                arabic_options += 1
+            elif paragraph_role == "section":
+                fmt.space_before = Pt(10)
+                fmt.space_after = Pt(7)
+                fmt.keep_with_next = True
+            else:
+                fmt.space_before = Pt(3)
+                fmt.space_after = Pt(6)
 
         for run in p.runs:
             if not run.text or not ARABIC_RE.search(run.text):
                 continue
-            run.font.name = "Noto Naskh Arabic"
-            run.font.size = Pt(16 if paragraph_role in {"question", "section"} else 15)
             rpr = run._r.get_or_add_rPr()
             rfonts = rpr.find(qn("w:rFonts"))
             if rfonts is None:
                 rfonts = OxmlElement("w:rFonts")
                 rpr.insert(0, rfonts)
-            for key in ("ascii", "hAnsi", "eastAsia", "cs"):
-                rfonts.set(qn("w:" + key), "Noto Naskh Arabic")
+
+            run_has_latin = bool(re.search(r"[A-Za-z]", run.text))
+            if run_has_latin:
+                # Preserve Latin font and size; set only the complex-script font slot.
+                rfonts.set(qn("w:cs"), "Noto Naskh Arabic")
+                sz_cs = rpr.find(qn("w:szCs"))
+                if sz_cs is None:
+                    sz_cs = OxmlElement("w:szCs")
+                    rpr.append(sz_cs)
+                sz_cs.set(qn("w:val"), "30")
+            else:
+                run.font.name = "Noto Naskh Arabic"
+                run.font.size = Pt(16 if paragraph_role in {"question", "section"} else 15)
+                for key in ("ascii", "hAnsi", "eastAsia", "cs"):
+                    rfonts.set(qn("w:" + key), "Noto Naskh Arabic")
+
             rtl = rpr.find(qn("w:rtl"))
             if rtl is None:
                 rtl = OxmlElement("w:rtl")
                 rpr.append(rtl)
             rtl.set(qn("w:val"), "1")
-            if paragraph_role == "section":
+            if paragraph_role == "section" and not run_has_latin:
                 run.bold = True
+
     print(
         "Arabic layout: "
-        f"{arabic_paragraphs} paragraphs, {arabic_questions} questions, "
-        f"{arabic_options} answer options; right-to-left Noto Naskh Arabic"
+        f"{arabic_paragraphs} Arabic paragraphs; {rtl_paragraphs} RTL-aligned, "
+        f"{mixed_paragraphs} English-led mixed; {arabic_questions} questions, "
+        f"{arabic_options} answer options; Noto Naskh Arabic"
     )
     return arabic_paragraphs, arabic_questions, arabic_options
 
