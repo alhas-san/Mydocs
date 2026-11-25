@@ -11,6 +11,7 @@ on:
       - "Incoming/**/*.docx"
       - "!Incoming/Microprocessor_exam_retry.docx"
       - "!Incoming/Microprocessor_exam_retry2.docx"
+      - "!Incoming/Microprocessor Exam.docx"
       - "workflow-prototype/format_reference_style.py"
   workflow_dispatch:
     inputs:
