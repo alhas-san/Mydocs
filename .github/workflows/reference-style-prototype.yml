@@ -141,9 +141,6 @@ jobs:
             exit 1
           fi
           case "$selected" in *.doc|*.docx) ;; *) echo "::error::The selected file must be a .doc or .docx document."; exit 1 ;; esac
-            echo "::error::The selected file must be a .doc or .docx document."
-            exit 1
-          fi
           echo "has_file=true" >> "$GITHUB_OUTPUT"
           echo "file_path=$selected" >> "$GITHUB_OUTPUT"
           echo "Selected exam: $selected" >> "$GITHUB_STEP_SUMMARY"
