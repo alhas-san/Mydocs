@@ -148,7 +148,7 @@ jobs:
           echo "file_path=$selected" >> "$GITHUB_OUTPUT"
           echo "Selected exam: $selected" >> "$GITHUB_STEP_SUMMARY"
       - name: Format only the selected exam
-        if: steps.selected_exam.outputs.has_file == 'true'
+        if: ${{ steps.selected_exam.outputs.has_file == 'true' }}
         shell: bash
         env:
           INPUT_FILE: ${{ steps.selected_exam.outputs.file_path }}
@@ -166,7 +166,7 @@ jobs:
             --reference "Analytical_Chemistry_I_Formatted.docx" \
             --output-prefix "$prefix"
       - name: Render first three pages of the selected exam
-        if: always() && steps.selected_exam.outputs.has_file == 'true'
+        if: ${{ always() && steps.selected_exam.outputs.has_file == 'true' }}
         run: |
           mkdir -p workflow-prototype/output/previews/uploaded
           for file in workflow-prototype/output/*.pdf; do
@@ -176,7 +176,7 @@ jobs:
           done
       - name: Upload automatically formatted exams
         id: upload_exams
-        if: success() && steps.selected_exam.outputs.has_file == 'true'
+        if: ${{ success() && steps.selected_exam.outputs.has_file == 'true' }}
         uses: actions/upload-artifact@v5
         with:
           name: formatted-exams-download
