@@ -9,7 +9,6 @@ on:
       - "!Analytical_Chemistry_I_Formatted.docx"
       - "Incoming/**/*.doc"
       - "Incoming/**/*.docx"
-      - ".github/workflows/reference-style-prototype.yml"
       - "workflow-prototype/format_reference_style.py"
   workflow_dispatch:
     inputs:
