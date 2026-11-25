@@ -707,12 +707,17 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
                 if not next_paragraph.text.strip():
                     break
                 next_role = role(next_paragraph.text)
+                next_ppr = next_paragraph._p.pPr
+                is_numbered_list_item = (
+                    next_ppr is not None and next_ppr.find(qn("w:numPr")) is not None
+                )
                 # Attach only the section's instruction block and, at most, its
-                # first numbered question. Further questions must paginate freely.
+                # first numbered list item. Word stores list numbering outside
+                # paragraph text, so role() alone cannot identify these items.
                 paragraph.paragraph_format.keep_with_next = True
                 paragraph = next_paragraph
                 next_index += 1
-                if next_role == "question":
+                if next_role == "question" or is_numbered_list_item:
                     break
             paragraph.paragraph_format.keep_together = True
             # Keep the last instruction/first question only with what follows
