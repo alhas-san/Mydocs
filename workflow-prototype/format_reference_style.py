@@ -69,17 +69,26 @@ def paragraph_numbering_info(doc, paragraph):
     ilvl_el = num_pr.find(qn("w:ilvl"))
     ilvl = ilvl_el.get(qn("w:val"), "0") if ilvl_el is not None else "0"
     numbering = doc.part.numbering_part.element
-    num_nodes = numbering.xpath(f'./w:num[@w:numId="{num_id}"]')
+    num_nodes = [
+        node for node in numbering.findall(qn("w:num"))
+        if node.get(qn("w:numId")) == num_id
+    ]
     if not num_nodes:
         return num_id, None
     abstract_id_el = num_nodes[0].find(qn("w:abstractNumId"))
     if abstract_id_el is None:
         return num_id, None
     abstract_id = abstract_id_el.get(qn("w:val"))
-    abstract_nodes = numbering.xpath(f'./w:abstractNum[@w:abstractNumId="{abstract_id}"]')
+    abstract_nodes = [
+        node for node in numbering.findall(qn("w:abstractNum"))
+        if node.get(qn("w:abstractNumId")) == abstract_id
+    ]
     if not abstract_nodes:
         return num_id, None
-    level_nodes = abstract_nodes[0].xpath(f'./w:lvl[@w:ilvl="{ilvl}"]')
+    level_nodes = [
+        node for node in abstract_nodes[0].findall(qn("w:lvl"))
+        if node.get(qn("w:ilvl")) == ilvl
+    ]
     if not level_nodes:
         return num_id, None
     fmt = level_nodes[0].find(qn("w:numFmt"))
