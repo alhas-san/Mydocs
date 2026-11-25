@@ -238,7 +238,10 @@ def apply_option_spacing(doc):
         # Chaining keep_with_next across A/B/C/D keeps the entire option set
         # with its question rather than allowing the last options to spill.
         if not inside_table_cell:
-            if paragraph_role in {"section", "question"} or (p.text.strip() and next_role == "option"):
+            # Keep section headings attached to their instruction, and question
+            # stems attached to answer options. Do not chain consecutive numbered
+            # questions (e.g. True/False lists) into one page-sized block.
+            if paragraph_role == "section" or (p.text.strip() and next_role == "option"):
                 p.paragraph_format.keep_with_next = True
             if paragraph_role == "option" and next_role == "option":
                 p.paragraph_format.keep_with_next = True
@@ -279,8 +282,10 @@ def apply_arabic_layout(doc):
     arabic_options = 0
     rtl_paragraphs = 0
     mixed_paragraphs = 0
-    for p in all_paragraphs(doc):
+    paragraphs = all_paragraphs(doc)
+    for paragraph_index, p in enumerate(paragraphs):
         paragraph_text = p.text or ""
+        next_role = role(paragraphs[paragraph_index + 1].text) if paragraph_index + 1 < len(paragraphs) else "empty"
         if not ARABIC_RE.search(paragraph_text):
             continue
         arabic_paragraphs += 1
@@ -319,7 +324,7 @@ def apply_arabic_layout(doc):
             if paragraph_role == "question":
                 fmt.space_before = Pt(9)
                 fmt.space_after = Pt(5)
-                fmt.keep_with_next = True
+                fmt.keep_with_next = (next_role == "option")
                 fmt.keep_together = True
                 arabic_questions += 1
             elif paragraph_role == "option":
@@ -682,7 +687,9 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
             if node.tag != qn("w:p"):
                 continue
             paragraph = Paragraph(node, doc)
-            if role(paragraph.text) not in {"question", "section"}:
+            if role(paragraph.text) != "section":
+                # Numbered question paragraphs are kept with their options by
+                # apply_option_spacing(); never chain one question to the next.
                 continue
             next_index = index + 1
             while next_index < len(body_children):
@@ -695,13 +702,20 @@ def format_exam(source, reference_path, output_prefix, exam_title=None):
                 next_paragraph = Paragraph(next_node, doc)
                 if not next_paragraph.text.strip():
                     break
+                next_role = role(next_paragraph.text)
+                # Attach only the section's instruction block and, at most, its
+                # first numbered question. Further questions must paginate freely.
                 paragraph.paragraph_format.keep_with_next = True
                 paragraph = next_paragraph
                 next_index += 1
-            # Keep the final instruction paragraph intact, but allow the following
-            # table to paginate independently.
+                if next_role == "question":
+                    break
             paragraph.paragraph_format.keep_together = True
-            paragraph.paragraph_format.keep_with_next = False
+            # Keep the last instruction/first question only with what follows
+            # when that next paragraph is an answer option.
+            paragraph.paragraph_format.keep_with_next = (role(paragraph.text) == "question" and
+                next_index < len(body_children) and body_children[next_index].tag == qn("w:p") and
+                role(Paragraph(body_children[next_index], doc).text) == "option")
 
         # Attach a nearby question heading/instructions to the first row of a
         # following table. Ignore intervening blank spacer paragraphs, but only
