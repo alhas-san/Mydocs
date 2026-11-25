@@ -103,10 +103,10 @@ jobs:
         id: selected_exam
         shell: bash
         env:
-          EVENT_NAME: \${{ github.event_name }}
-          EVENT_BEFORE: \${{ github.event.before }}
-          EVENT_SHA: \${{ github.sha }}
-          MANUAL_FILE_PATH: \${{ inputs.file_path }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_SHA: ${{ github.sha }}
+          MANUAL_FILE_PATH: ${{ inputs.file_path }}
         run: |
           set -euo pipefail
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
@@ -128,17 +128,17 @@ jobs:
                   ;;
               esac
             done)
-            if [[ "\${#files[@]}" -eq 0 ]]; then
+            if [[ "${#files[@]}" -eq 0 ]]; then
               # A workflow-only repair commit re-tests the latest exam in Incoming.
-              latest="$(git log -1 --format= --name-only --diff-filter=AM "$EVENT_SHA" -- Incoming | grep -Ei '\\.(doc|docx)$' | head -n 1 || true)"
+              latest="$(git log -1 --format= --name-only --diff-filter=AM "$EVENT_SHA" -- Incoming | grep -Ei '\.(doc|docx)$' | head -n 1 || true)"
               if [[ -n "$latest" ]]; then files=("$latest"); fi
             fi
-            if [[ "\${#files[@]}" -eq 0 ]]; then
+            if [[ "${#files[@]}" -eq 0 ]]; then
               echo "::error::No newly added or updated Word exam was found."
               exit 1
             fi
-            selected="\${files[-1]}"
-            if [[ "\${#files[@]}" -gt 1 ]]; then
+            selected="${files[-1]}"
+            if [[ "${#files[@]}" -gt 1 ]]; then
               echo "::warning::Multiple exams changed; processing only: $selected"
             fi
           fi
@@ -152,13 +152,13 @@ jobs:
       - name: Format only the selected exam
         shell: bash
         env:
-          INPUT_FILE: \${{ steps.selected_exam.outputs.file_path }}
+          INPUT_FILE: ${{ steps.selected_exam.outputs.file_path }}
         run: |
           set -euo pipefail
           rm -rf workflow-prototype/output
           mkdir -p workflow-prototype/output
           base="$(basename "$INPUT_FILE")"
-          stem="\${base%.*}"
+          stem="${base%.*}"
           if [[ "$INPUT_FILE" == Incoming/* ]]; then stem="Incoming_$stem"; fi
           prefix="$(printf '%s' "$stem" | tr -cs '[:alnum:]_.-' '_')"
           echo "Formatting only: $INPUT_FILE"
@@ -189,7 +189,7 @@ jobs:
       - name: Publish download instructions
         if: success()
         env:
-          ARTIFACT_URL: \${{ steps.upload_exams.outputs.artifact-url }}
+          ARTIFACT_URL: ${{ steps.upload_exams.outputs.artifact-url }}
         run: |
           {
             echo "# Your formatted exam is ready"
@@ -198,15 +198,15 @@ jobs:
             echo
             echo "The ZIP contains only the selected exam in editable Word and print-ready PDF formats."
             echo "Files are available for 30 days."
-            echo "[Open this workflow run](https://github.com/\${{ github.repository }}/actions/runs/\${{ github.run_id }})"
+            echo "[Open this workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Email only the selected formatted exam
         if: success()
         shell: bash
         env:
-          SMTP_USERNAME: \${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: \${{ secrets.SMTP_PASSWORD }}
-          SMTP_FROM: \${{ secrets.SMTP_FROM }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
           EMAIL_TO: Alhassan@taibah.edu.sd
         run: |
           set -euo pipefail
