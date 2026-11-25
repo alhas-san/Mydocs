@@ -56,6 +56,36 @@ def all_paragraphs(doc):
                 out.extend(cell.paragraphs)
     return out
 
+def paragraph_numbering_info(doc, paragraph):
+    """Return (numId, numFmt) for a Word-numbered paragraph, if present."""
+    ppr = paragraph._p.pPr
+    num_pr = ppr.find(qn("w:numPr")) if ppr is not None else None
+    if num_pr is None:
+        return None, None
+    num_id_el = num_pr.find(qn("w:numId"))
+    if num_id_el is None:
+        return None, None
+    num_id = num_id_el.get(qn("w:val"))
+    ilvl_el = num_pr.find(qn("w:ilvl"))
+    ilvl = ilvl_el.get(qn("w:val"), "0") if ilvl_el is not None else "0"
+    numbering = doc.part.numbering_part.element
+    num_nodes = numbering.xpath(f'./w:num[@w:numId="{num_id}"]')
+    if not num_nodes:
+        return num_id, None
+    abstract_id_el = num_nodes[0].find(qn("w:abstractNumId"))
+    if abstract_id_el is None:
+        return num_id, None
+    abstract_id = abstract_id_el.get(qn("w:val"))
+    abstract_nodes = numbering.xpath(f'./w:abstractNum[@w:abstractNumId="{abstract_id}"]')
+    if not abstract_nodes:
+        return num_id, None
+    level_nodes = abstract_nodes[0].xpath(f'./w:lvl[@w:ilvl="{ilvl}"]')
+    if not level_nodes:
+        return num_id, None
+    fmt = level_nodes[0].find(qn("w:numFmt"))
+    return num_id, fmt.get(qn("w:val")) if fmt is not None else None
+
+
 def font_signature(run):
     f = run.font
     color = None
@@ -228,6 +258,11 @@ def apply_option_spacing(doc):
         inside_table_cell = p._p.getparent() is not None and p._p.getparent().tag == qn("w:tc")
         paragraph_role = role(p.text)
         next_role = role(paragraphs[index + 1].text) if index + 1 < len(paragraphs) else "empty"
+        current_num_id, current_num_fmt = paragraph_numbering_info(doc, p)
+        if index + 1 < len(paragraphs):
+            next_num_id, next_num_fmt = paragraph_numbering_info(doc, paragraphs[index + 1])
+        else:
+            next_num_id, next_num_fmt = None, None
         has_inline_image = bool(p._p.xpath(".//w:drawing | .//w:pict"))
         next_has_inline_image = (
             index + 1 < len(paragraphs)
@@ -249,6 +284,16 @@ def apply_option_spacing(doc):
                 p.paragraph_format.keep_with_next = True
             if paragraph_role == "option" and next_role == "option":
                 p.paragraph_format.keep_with_next = True
+            # Word often stores A-D option labels in numbering.xml rather than
+            # in paragraph text. Detect alphabetic list groups and keep the stem
+            # with the first option, then keep the four options together.
+            if current_num_fmt in {"decimal", "decimalZero"} and next_num_fmt in {"upperLetter", "lowerLetter"}:
+                p.paragraph_format.keep_with_next = True
+            elif current_num_fmt in {"upperLetter", "lowerLetter"}:
+                p.paragraph_format.keep_together = True
+                p.paragraph_format.keep_with_next = (
+                    next_num_id == current_num_id and next_num_fmt == current_num_fmt
+                )
         if p.text.strip() and next_has_inline_image:
             p.paragraph_format.keep_with_next = True
         if has_inline_image:
