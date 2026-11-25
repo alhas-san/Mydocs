@@ -238,6 +238,10 @@ def apply_option_spacing(doc):
         # Chaining keep_with_next across A/B/C/D keeps the entire option set
         # with its question rather than allowing the last options to spill.
         if not inside_table_cell:
+            # Clear inherited source keep-next flags first. Many uploaded exams
+            # mark every numbered list item keep-with-next, which chains an entire
+            # section and can leave the first page nearly empty.
+            p.paragraph_format.keep_with_next = False
             # Keep section headings attached to their instruction, and question
             # stems attached to answer options. Do not chain consecutive numbered
             # questions (e.g. True/False lists) into one page-sized block.
