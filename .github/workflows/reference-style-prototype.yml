@@ -10,6 +10,7 @@ on:
       - "Incoming/**/*.doc"
       - "Incoming/**/*.docx"
       - ".github/workflows/reference-style-prototype.yml"
+      - "workflow-prototype/format_reference_style.py"
   workflow_dispatch:
     inputs:
       file_path:
