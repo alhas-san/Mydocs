@@ -12,6 +12,11 @@ on:
       - "Incoming/**"
       - ".github/workflows/reference-style-prototype.yml"
   workflow_dispatch:
+    inputs:
+      file_path:
+        description: "Repository path of the single exam to format (for manual runs)"
+        required: false
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -98,35 +103,65 @@ jobs:
           python-version: "3.12"
       - name: Install document dependency
         run: python -m pip install --upgrade pip "python-docx>=1.1,<2"
-      - name: Format every uploaded Word exam
+      - name: Identify the single newly added exam
+        id: selected_exam
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_SHA: ${{ github.sha }}
+          MANUAL_FILE_PATH: ${{ inputs.file_path }}
         run: |
           set -euo pipefail
-          mapfile -d '' files < <(
-            find . -maxdepth 1 -type f \( -iname '*.doc' -o -iname '*.docx' \) \
-              ! -name 'Analytical_Chemistry_I_Formatted.docx' -print0
-            if [ -d Incoming ]; then
-              find Incoming -type f \( -iname '*.doc' -o -iname '*.docx' \) -print0
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            selected="$MANUAL_FILE_PATH"
+            if [[ -z "$selected" ]]; then
+              echo "::error::For a manual run, enter the exact repository path of the one exam to format."
+              exit 1
             fi
-          )
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No uploaded exam documents found."
-            exit 0
+          else
+            if [[ "$EVENT_BEFORE" =~ ^0+$ ]]; then
+              changed="$(git diff-tree --no-commit-id --name-only -r --diff-filter=AM "$EVENT_SHA")"
+            else
+              changed="$(git diff --name-only --diff-filter=AM "$EVENT_BEFORE" "$EVENT_SHA")"
+            fi
+            mapfile -t files < <(printf '%s\\n' "$changed" | grep -Ei '\\.(doc|docx)$' | grep -v '^Analytical_Chemistry_I_Formatted\\.docx$' || true)
+            if [[ "${#files[@]}" -eq 0 ]]; then
+              echo "::error::No newly added or updated Word exam was found in this upload."
+              exit 1
+            fi
+            selected="${files[-1]}"
+            if [[ "${#files[@]}" -gt 1 ]]; then
+              echo "::warning::Multiple exam files changed; processing only the last one in the change list: $selected"
+            fi
           fi
-          for file in "${files[@]}"; do
-            relative="${file#./}"
-            base="$(basename "$file")"
-            stem="${base%.*}"
-            if [[ "$relative" == Incoming/* ]]; then
-              stem="Incoming_${stem}"
-            fi
-            prefix="$(printf '%s' "$stem" | tr -cs '[:alnum:]_.-' '_')"
-            echo "Formatting: $relative"
-            python workflow-prototype/format_reference_style.py \
-              --input "$relative" \
-              --reference "Analytical_Chemistry_I_Formatted.docx" \
-              --output-prefix "$prefix"
-          done
+          if [[ ! -f "$selected" ]]; then
+            echo "::error::The selected exam does not exist: $selected"
+            exit 1
+          fi
+          if [[ ! "$selected" =~ \\.(doc|docx)$ ]]; then
+            echo "::error::The selected file must be a .doc or .docx document."
+            exit 1
+          fi
+          echo "file_path=$selected" >> "$GITHUB_OUTPUT"
+          echo "Selected exam: $selected" >> "$GITHUB_STEP_SUMMARY"
+      - name: Format only the selected exam
+        shell: bash
+        env:
+          INPUT_FILE: ${{ steps.selected_exam.outputs.file_path }}
+        run: |
+          set -euo pipefail
+          base="$(basename "$INPUT_FILE")"
+          stem="${base%.*}"
+          if [[ "$INPUT_FILE" == Incoming/* ]]; then
+            stem="Incoming_${stem}"
+          fi
+          prefix="$(printf '%s' "$stem" | tr -cs '[:alnum:]_.-' '_')"
+          echo "Formatting only: $INPUT_FILE"
+          python workflow-prototype/format_reference_style.py \
+            --input "$INPUT_FILE" \
+            --reference "Analytical_Chemistry_I_Formatted.docx" \
+            --output-prefix "$prefix"
       - name: Render first three pages of every uploaded exam
         if: always()
         run: |
