@@ -125,7 +125,324 @@ jobs:
             else
               changed="$(git diff --name-only --diff-filter=AM "$EVENT_BEFORE" "$EVENT_SHA")"
             fi
-            mapfile -t files < <(printf '%s\\n' "$changed" | grep -Ei '\\.(doc|docx)$' | grep -v '^Analytical_Chemistry_I_Formatted\\.docx$' || true)
+            mapfile -t files < <(printf '%s\n' "$changed" | grep -Ei '\.(doc|docx) || true)
+            if [[ "${#files[@]}" -eq 0 ]]; then
+              echo "has_file=false" >> "$GITHUB_OUTPUT"
+              echo "No new exam file was included in this workflow change; no documents will be processed or emailed." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            selected="${files[-1]}"
+            if [[ "${#files[@]}" -gt 1 ]]; then
+              echo "::warning::Multiple exam files changed; processing only the last one in the change list: $selected"
+            fi
+          fi
+          if [[ ! -f "$selected" ]]; then
+            echo "::error::The selected exam does not exist: $selected"
+            exit 1
+          fi
+          if [[ ! "$selected" =~ \\.(doc|docx)$ ]]; then
+            echo "::error::The selected file must be a .doc or .docx document."
+            exit 1
+          fi
+          echo "has_file=true" >> "$GITHUB_OUTPUT"
+          echo "file_path=$selected" >> "$GITHUB_OUTPUT"
+          echo "Selected exam: $selected" >> "$GITHUB_STEP_SUMMARY"
+      - name: Format only the selected exam
+        if: steps.selected_exam.outputs.has_file == 'true'
+        shell: bash
+        env:
+          INPUT_FILE: ${{ steps.selected_exam.outputs.file_path }}
+        run: |
+          set -euo pipefail
+          base="$(basename "$INPUT_FILE")"
+          stem="${base%.*}"
+          if [[ "$INPUT_FILE" == Incoming/* ]]; then
+            stem="Incoming_${stem}"
+          fi
+          prefix="$(printf '%s' "$stem" | tr -cs '[:alnum:]_.-' '_')"
+          echo "Formatting only: $INPUT_FILE"
+          python workflow-prototype/format_reference_style.py \
+            --input "$INPUT_FILE" \
+            --reference "Analytical_Chemistry_I_Formatted.docx" \
+            --output-prefix "$prefix"
+      - name: Render first three pages of the selected exam
+        if: always() && steps.selected_exam.outputs.has_file == 'true'
+        run: |
+          mkdir -p workflow-prototype/output/previews/uploaded
+          for file in workflow-prototype/output/*.pdf; do
+            [ -f "$file" ] || continue
+            name="$(basename "$file" .pdf)"
+            pdftoppm -f 1 -l 3 -png -r 110 "$file" "workflow-prototype/output/previews/uploaded/$name-page" || true
+          done
+      - name: Upload automatically formatted exams
+        id: upload_exams
+        if: success() && steps.selected_exam.outputs.has_file == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: formatted-exams-download
+          path: |
+            workflow-prototype/output/*.docx
+            workflow-prototype/output/*.pdf
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish simple download instructions
+        if: success() && steps.selected_exam.outputs.has_file == 'true'
+        shell: bash
+        env:
+          ARTIFACT_URL: ${{ steps.upload_exams.outputs.artifact-url }}
+        run: |
+          {
+            echo "# Your formatted exams are ready"
+            echo
+            echo "## [Download all formatted exams (Word + PDF)]($ARTIFACT_URL)"
+            echo
+            echo "The download contains the editable Word files and print-ready PDF files."
+            echo "On a phone, download the ZIP and extract it using your Files app."
+            echo
+            echo "Files are available for 30 days after this workflow run."
+            echo
+            echo "[Open this workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Email formatted exams to the configured recipient
+        if: success() && steps.selected_exam.outputs.has_file == 'true'
+        shell: bash
+        env:
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          EMAIL_TO: Alhassan@taibah.edu.sd
+        run: |
+          set -euo pipefail
+          if [[ -z "$SMTP_USERNAME" || -z "$SMTP_PASSWORD" ]]; then
+            echo "Email delivery is not configured yet. Add SMTP_USERNAME and SMTP_PASSWORD in the repository Actions secrets to enable automatic delivery." >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::Email delivery skipped because SMTP credentials are not configured."
+            exit 0
+          fi
+
+          python - <<'PY'
+          import glob
+          import mimetypes
+          import os
+          import smtplib
+          import ssl
+          from email.message import EmailMessage
+          from pathlib import Path
+
+          recipient = os.environ["EMAIL_TO"]
+          username = os.environ["SMTP_USERNAME"]
+          sender = os.environ.get("SMTP_FROM") or username
+          smtp_host = "smtp.gmail.com"
+          port = 587
+          files = sorted(
+              glob.glob("workflow-prototype/output/*.docx")
+              + glob.glob("workflow-prototype/output/*.pdf")
+          )
+          if not files:
+              raise SystemExit("No formatted Word or PDF files were found to email.")
+
+          message = EmailMessage()
+          message["Subject"] = "Your formatted examination documents are ready"
+          message["From"] = sender
+          message["To"] = recipient
+          message.set_content(
+              "Dear Alhassan,\n\n"
+              "Your examination documents have been successfully formatted. "
+              "The editable Word files and print-ready PDF files are attached.\n\n"
+              "Best regards,\n"
+              "Examination Document Processing System"
+          )
+
+          for filename in files:
+              path = Path(filename)
+              content_type, _ = mimetypes.guess_type(path.name)
+              maintype, subtype = (content_type or "application/octet-stream").split("/", 1)
+              message.add_attachment(
+                  path.read_bytes(),
+                  maintype=maintype,
+                  subtype=subtype,
+                  filename=path.name,
+              )
+
+          context = ssl.create_default_context()
+          print(f"Connecting to Gmail SMTP ({smtp_host}:{port})...")
+          with smtplib.SMTP(smtp_host, port, timeout=30) as server:
+              server.ehlo()
+              server.starttls(context=context)
+              server.ehlo()
+              server.login(username, os.environ["SMTP_PASSWORD"])
+              server.send_message(message)
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(
+                  f"\\nEmail successfully sent to **{recipient}** with "
+                  f"{len(files)} attachments.\\n"
+              )
+          print(f"Successfully emailed {len(files)} files to {recipient}.")
+          PY
+
+# Trigger a fresh validation of Arabic and mixed-language paragraph direction.
+# Trigger validation after keeping question instructions with their tables without chaining entire tables.
+ | grep -v '^Analytical_Chemistry_I_Formatted\.docx || true)
+            if [[ "${#files[@]}" -eq 0 ]]; then
+              echo "::error::No newly added or updated Word exam was found in this upload."
+              exit 1
+            fi
+            selected="${files[-1]}"
+            if [[ "${#files[@]}" -gt 1 ]]; then
+              echo "::warning::Multiple exam files changed; processing only the last one in the change list: $selected"
+            fi
+          fi
+          if [[ ! -f "$selected" ]]; then
+            echo "::error::The selected exam does not exist: $selected"
+            exit 1
+          fi
+          if [[ ! "$selected" =~ \\.(doc|docx)$ ]]; then
+            echo "::error::The selected file must be a .doc or .docx document."
+            exit 1
+          fi
+          echo "file_path=$selected" >> "$GITHUB_OUTPUT"
+          echo "Selected exam: $selected" >> "$GITHUB_STEP_SUMMARY"
+      - name: Format only the selected exam
+        shell: bash
+        env:
+          INPUT_FILE: ${{ steps.selected_exam.outputs.file_path }}
+        run: |
+          set -euo pipefail
+          base="$(basename "$INPUT_FILE")"
+          stem="${base%.*}"
+          if [[ "$INPUT_FILE" == Incoming/* ]]; then
+            stem="Incoming_${stem}"
+          fi
+          prefix="$(printf '%s' "$stem" | tr -cs '[:alnum:]_.-' '_')"
+          echo "Formatting only: $INPUT_FILE"
+          python workflow-prototype/format_reference_style.py \
+            --input "$INPUT_FILE" \
+            --reference "Analytical_Chemistry_I_Formatted.docx" \
+            --output-prefix "$prefix"
+      - name: Render first three pages of every uploaded exam
+        if: always()
+        run: |
+          mkdir -p workflow-prototype/output/previews/uploaded
+          for file in workflow-prototype/output/*.pdf; do
+            [ -f "$file" ] || continue
+            name="$(basename "$file" .pdf)"
+            pdftoppm -f 1 -l 3 -png -r 110 "$file" "workflow-prototype/output/previews/uploaded/$name-page" || true
+          done
+      - name: Upload automatically formatted exams
+        id: upload_exams
+        if: success()
+        uses: actions/upload-artifact@v5
+        with:
+          name: formatted-exams-download
+          path: |
+            workflow-prototype/output/*.docx
+            workflow-prototype/output/*.pdf
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish simple download instructions
+        if: success()
+        shell: bash
+        env:
+          ARTIFACT_URL: ${{ steps.upload_exams.outputs.artifact-url }}
+        run: |
+          {
+            echo "# Your formatted exams are ready"
+            echo
+            echo "## [Download all formatted exams (Word + PDF)]($ARTIFACT_URL)"
+            echo
+            echo "The download contains the editable Word files and print-ready PDF files."
+            echo "On a phone, download the ZIP and extract it using your Files app."
+            echo
+            echo "Files are available for 30 days after this workflow run."
+            echo
+            echo "[Open this workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Email formatted exams to the configured recipient
+        if: success()
+        shell: bash
+        env:
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          EMAIL_TO: Alhassan@taibah.edu.sd
+        run: |
+          set -euo pipefail
+          if [[ -z "$SMTP_USERNAME" || -z "$SMTP_PASSWORD" ]]; then
+            echo "Email delivery is not configured yet. Add SMTP_USERNAME and SMTP_PASSWORD in the repository Actions secrets to enable automatic delivery." >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::Email delivery skipped because SMTP credentials are not configured."
+            exit 0
+          fi
+
+          python - <<'PY'
+          import glob
+          import mimetypes
+          import os
+          import smtplib
+          import ssl
+          from email.message import EmailMessage
+          from pathlib import Path
+
+          recipient = os.environ["EMAIL_TO"]
+          username = os.environ["SMTP_USERNAME"]
+          sender = os.environ.get("SMTP_FROM") or username
+          smtp_host = "smtp.gmail.com"
+          port = 587
+          files = sorted(
+              glob.glob("workflow-prototype/output/*.docx")
+              + glob.glob("workflow-prototype/output/*.pdf")
+          )
+          if not files:
+              raise SystemExit("No formatted Word or PDF files were found to email.")
+
+          message = EmailMessage()
+          message["Subject"] = "Your formatted examination documents are ready"
+          message["From"] = sender
+          message["To"] = recipient
+          message.set_content(
+              "Dear Alhassan,\n\n"
+              "Your examination documents have been successfully formatted. "
+              "The editable Word files and print-ready PDF files are attached.\n\n"
+              "Best regards,\n"
+              "Examination Document Processing System"
+          )
+
+          for filename in files:
+              path = Path(filename)
+              content_type, _ = mimetypes.guess_type(path.name)
+              maintype, subtype = (content_type or "application/octet-stream").split("/", 1)
+              message.add_attachment(
+                  path.read_bytes(),
+                  maintype=maintype,
+                  subtype=subtype,
+                  filename=path.name,
+              )
+
+          context = ssl.create_default_context()
+          print(f"Connecting to Gmail SMTP ({smtp_host}:{port})...")
+          with smtplib.SMTP(smtp_host, port, timeout=30) as server:
+              server.ehlo()
+              server.starttls(context=context)
+              server.ehlo()
+              server.login(username, os.environ["SMTP_PASSWORD"])
+              server.send_message(message)
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(
+                  f"\\nEmail successfully sent to **{recipient}** with "
+                  f"{len(files)} attachments.\\n"
+              )
+          print(f"Successfully emailed {len(files)} files to {recipient}.")
+          PY
+
+# Trigger a fresh validation of Arabic and mixed-language paragraph direction.
+# Trigger validation after keeping question instructions with their tables without chaining entire tables.
+ || true)
             if [[ "${#files[@]}" -eq 0 ]]; then
               echo "::error::No newly added or updated Word exam was found in this upload."
               exit 1
