@@ -332,12 +332,12 @@ def format_doc(src,dest):
             for r in p.runs: font(r,BODY,rtl=rtl)
         elif kind=="subquestion":
             pf.left_indent=Cm(.45); pf.first_line_indent=Cm(-.2); pf.keep_together=True
-            for r in p.runs: font(r,BODY)
+            for r in p.runs: font(r,BODY,rtl=rtl)
         elif kind=="metadata":
             pf.space_after=Pt(3)
             for r in p.runs: font(r,10,True,rtl=rtl)
         else:
-            for r in p.runs: font(r,BODY)
+            for r in p.runs: font(r,BODY,rtl=rtl)
         if kind in counts: counts[kind]+=1
     for table in doc.tables:
         table.autofit=True
