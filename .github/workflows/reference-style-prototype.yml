@@ -9,6 +9,8 @@ on:
       - "!Analytical_Chemistry_I_Formatted.docx"
       - "Incoming/**/*.doc"
       - "Incoming/**/*.docx"
+      - "!Incoming/Microprocessor_exam_retry.docx"
+      - "!Incoming/Microprocessor_exam_retry2.docx"
       - "workflow-prototype/format_reference_style.py"
   workflow_dispatch:
     inputs:
