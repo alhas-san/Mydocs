@@ -24,6 +24,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   analytical-chemistry-reference:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -52,6 +53,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   rehabilitation-engineering-reference:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
