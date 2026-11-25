@@ -7,7 +7,8 @@ on:
       - "*.doc"
       - "*.docx"
       - "!Analytical_Chemistry_I_Formatted.docx"
-      - "Incoming/**"
+      - "Incoming/**/*.doc"
+      - "Incoming/**/*.docx"
   workflow_dispatch:
     inputs:
       file_path:
@@ -86,7 +87,7 @@ jobs:
 
 
   format-all-uploaded-exams:
-    name: Format every uploaded exam with editable academic header
+    name: Format and email only the newly added exam
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -184,9 +185,9 @@ jobs:
           ARTIFACT_URL: ${{ steps.upload_exams.outputs.artifact-url }}
         run: |
           {
-            echo "# Your formatted exams are ready"
+            echo "# Your formatted exam is ready"
             echo
-            echo "## [Download all formatted exams (Word + PDF)]($ARTIFACT_URL)"
+            echo "## [Download the formatted exam (Word + PDF)]($ARTIFACT_URL)"
             echo
             echo "The download contains the editable Word files and print-ready PDF files."
             echo "On a phone, download the ZIP and extract it using your Files app."
@@ -196,7 +197,7 @@ jobs:
             echo "[Open this workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Email formatted exams to the configured recipient
+      - name: Email the selected formatted exam to the configured recipient
         if: success()
         shell: bash
         env:
@@ -235,13 +236,13 @@ jobs:
               raise SystemExit("No formatted Word or PDF files were found to email.")
 
           message = EmailMessage()
-          message["Subject"] = "Your formatted examination documents are ready"
+          message["Subject"] = "Your formatted examination is ready"
           message["From"] = sender
           message["To"] = recipient
           message.set_content(
               "Dear Alhassan,\n\n"
-              "Your examination documents have been successfully formatted. "
-              "The editable Word files and print-ready PDF files are attached.\n\n"
+              "Your examination has been successfully formatted. "
+              "The editable Word document and print-ready PDF are attached.\n\n"
               "Best regards,\n"
               "Examination Document Processing System"
           )
