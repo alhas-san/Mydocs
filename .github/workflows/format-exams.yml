@@ -8,10 +8,13 @@ on:
       - "*.docx"
       - "Incoming/*.doc"
       - "Incoming/*.docx"
+      - "!Incoming/Microprocessor Exam.docx"
+      - "!Incoming/Microprocessor.docx"
+      - "!Incoming/Microprocessor_exam_retry.docx"
+      - "!Incoming/Microprocessor_exam_retry2.docx"
       - "scripts/format_exams.py"
       - "scripts/review_exam_documents.py"
       - "tests/**"
-      - ".github/workflows/format-exams.yml"
 
 permissions:
   contents: write
